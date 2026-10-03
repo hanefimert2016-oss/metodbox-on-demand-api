@@ -5,13 +5,16 @@ GitHub Actions üzerinde çalışan, yalnızca gerçek bir soru geldiğinde geç
 ## Mimari
 
 ```text
-İstemci
+İstemci mesajı
   |
-  | GitHub REST API / workflow_dispatch
+  | POST GitHub repository_dispatch
   v
-GitHub Actions
+GitHub
   |
-  | geçici Ubuntu runner
+  | mesajı görünce workflow otomatik başlar
+  v
+GitHub Actions Ubuntu runner
+  |
   v
 Metodbox GPT+ / gpt-5.1
   |
@@ -19,17 +22,14 @@ Metodbox GPT+ / gpt-5.1
 response.json artifact
   |
   v
-İstemci sonucu indirir
-  |
-  v
 Runner kapanır
 ```
 
-Boşta çalışan sunucu, health-check, scheduler veya sürekli açık runner yoktur.
+Repo klonlamak gerekmez. Boşta çalışan sunucu, daemon, health-check veya scheduler yoktur.
 
 ## Bir kere yapılacak kurulum
 
-Metodbox tokenını bu repoya Actions secret olarak ekle:
+Metodbox tokenı yalnızca Actions Secret olarak tutulur:
 
 ```bash
 gh secret set METODBOX_TOKEN \
@@ -37,63 +37,74 @@ gh secret set METODBOX_TOKEN \
   < ~/.config/metodbox-proxy/metodbox_token
 ```
 
-Gerekli istemci araçları (Arch Linux):
+## Mesaj gönderme — repo klonlamadan
 
-```bash
-sudo pacman -S github-cli jq
-gh auth login
-```
-
-## Soru sorma
-
-Repoyu klonla:
-
-```bash
-git clone https://github.com/hanefimert2016-oss/metodbox-on-demand-api.git
-cd metodbox-on-demand-api
-chmod +x ask.sh
-```
-
-Sonra:
-
-```bash
-./ask.sh "Sadece MERHABA yaz"
-```
-
-Her çağrı yeni bir `request_id` üretir, tek bir GitHub Actions workflow'u açar ve GPT+'a yalnızca bir kullanıcı sorusu gönderir.
-
-## HTTP tetikleme
-
-GitHub'ın kendi REST endpoint'i kullanılır:
+GitHub'ın sabit REST endpoint'i API girişidir:
 
 ```text
-POST https://api.github.com/repos/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/on-demand-api.yml/dispatches
+POST https://api.github.com/repos/hanefimert2016-oss/metodbox-on-demand-api/dispatches
 ```
 
-Örnek gövde:
+Örnek:
 
-```json
-{
-  "ref": "main",
-  "inputs": {
-    "question": "Merhaba, nasılsın?",
-    "request_id": "benzersiz-id"
-  }
-}
+```bash
+RID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+
+curl -sS -X POST \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/hanefimert2016-oss/metodbox-on-demand-api/dispatches \
+  -d "$(jq -nc \
+    --arg q 'Sadece MERHABA yaz' \
+    --arg id "$RID" \
+    '{event_type:"metodbox_question",client_payload:{question:$q,request_id:$id}}')"
 ```
 
-Bu çağrı `204 No Content` döndürür. Cevap, workflow tamamlanınca
-`api-response-<request_id>` adlı Actions artifact'ında `response.json` olarak bulunur.
+Bu HTTP isteği geldiği anda GitHub `repository_dispatch` olayını üretir ve
+`.github/workflows/on-demand-api.yml` otomatik başlar.
+
+## Cevap
+
+Workflow adı:
+
+```text
+API Request <request_id>
+```
+
+Cevap artifact adı:
+
+```text
+api-response-<request_id>
+```
+
+İçinde:
+
+```text
+response.json
+```
+
+bulunur.
+
+GitHub dispatch isteği senkron olarak model cevabını döndürmez. `204 No Content`
+döndürür; model cevabı workflow tamamlandıktan sonra Actions artifact API'sinden alınır.
+
+## Önemli sınır
+
+GitHub Actions, boşta kapalıyken sonradan aynı TCP bağlantısına cevap verebilen bir
+HTTP application server değildir. Bu nedenle saf GitHub-only tasarım asenkrondur:
+
+```text
+POST mesaj -> runner açılır -> result artifact -> GET sonuç
+```
+
+OpenAI uyumlu tek çağrıda `POST /v1/chat/completions -> cevap` davranışı istenirse,
+isteği karşılamak için sürekli erişilebilir bir ingress/proxy gerekir.
 
 ## Kota davranışı
 
 - Boştayken GPT+ isteği yok.
 - Model listesi polling'i yok.
 - Schedule yok.
-- Her workflow, GPT+'a yalnızca bir kullanıcı mesajı gönderir.
-- Aynı anda yalnızca bir model isteği çalışır; diğerleri GitHub kuyruğunda bekler.
-
-## Güvenlik
-
-`METODBOX_TOKEN` yalnızca GitHub Actions Secret olarak tutulmalıdır. Tokenı repoya commit etme.
-İstemci tarafında GitHub kimlik doğrulaması için `gh auth login` kullanılır.
+- Her workflow GPT+'a yalnızca bir kullanıcı mesajı gönderir.
+- Aynı anda yalnızca bir model isteği çalışır.
