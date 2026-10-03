@@ -114,3 +114,22 @@ için yerel `gh` oturumu gerektirir.
 - Ham API key repository_dispatch payload'ına yazılmaz.
 - Workflow yalnızca HMAC imzasını görür.
 - İstekler 5 dakikalık zaman penceresi ile doğrulanır.
+
+
+## Cline/OpenAI uyumlu HTTPS giriş
+
+Repo artık `cloudflare-worker/` altında Cline'ın doğrudan kullanabileceği OpenAI uyumlu giriş kodunu da içerir.
+
+Hedef:
+
+```text
+Cline
+  -> POST /v1/chat/completions + API_KEY
+  -> Cloudflare Worker
+  -> GitHub App installation token
+  -> GitHub Actions
+  -> GPT+
+  -> OpenAI-compatible response
+```
+
+Cline tarafında GitHub tokenı veya GitHub oturumu yoktur. GitHub kimliği yalnızca Worker'ın GitHub App secretlarında tutulur.
