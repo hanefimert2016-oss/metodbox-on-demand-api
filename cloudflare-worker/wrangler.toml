@@ -1,0 +1,6 @@
+name = "metodbox-on-demand-api"
+main = "src/index.js"
+compatibility_date = "2026-10-03"
+
+[observability]
+enabled = true
