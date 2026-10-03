@@ -1,8 +1,11 @@
 name: Metodbox On-Demand API
 
-run-name: API Request ${{ inputs.request_id }}
+run-name: API Request ${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
 
 on:
+  repository_dispatch:
+    types: [metodbox_question]
+
   workflow_dispatch:
     inputs:
       question:
@@ -26,6 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    env:
+      QUESTION: ${{ github.event.client_payload.question || inputs.question }}
+      REQUEST_ID: ${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,14 +51,10 @@ jobs:
         continue-on-error: true
         env:
           METODBOX_TOKEN: ${{ secrets.METODBOX_TOKEN }}
-          QUESTION: ${{ inputs.question }}
-          REQUEST_ID: ${{ inputs.request_id }}
         run: python worker.py
 
       - name: Ensure response exists
         if: always()
-        env:
-          REQUEST_ID: ${{ inputs.request_id }}
         run: |
           mkdir -p api-response
           if [ ! -f api-response/response.json ]; then
@@ -81,7 +84,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-response-${{ inputs.request_id }}
+          name: api-response-${{ env.REQUEST_ID }}
           path: api-response/response.json
           if-no-files-found: error
           retention-days: 1
