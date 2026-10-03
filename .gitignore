@@ -1,0 +1,4 @@
+api-response/
+__pycache__/
+*.pyc
+.env
