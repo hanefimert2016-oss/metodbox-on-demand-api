@@ -1,0 +1,87 @@
+name: Metodbox On-Demand API
+
+run-name: API Request ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      question:
+        description: "One question for GPT+"
+        required: true
+        type: string
+      request_id:
+        description: "Unique client request id"
+        required: true
+        type: string
+
+concurrency:
+  group: metodbox-on-demand-api-single-request
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  request:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --disable-pip-version-check playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Process one question
+        continue-on-error: true
+        env:
+          METODBOX_TOKEN: ${{ secrets.METODBOX_TOKEN }}
+          QUESTION: ${{ inputs.question }}
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: python worker.py
+
+      - name: Ensure response exists
+        if: always()
+        env:
+          REQUEST_ID: ${{ inputs.request_id }}
+        run: |
+          mkdir -p api-response
+          if [ ! -f api-response/response.json ]; then
+            python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("api-response/response.json").write_text(
+              json.dumps(
+                  {
+                      "status": "error",
+                      "request_id": os.environ.get("REQUEST_ID", ""),
+                      "model": "gpt-5.1",
+                      "answer": "",
+                      "error": "Worker exited before response.json was created",
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+              ),
+              encoding="utf-8",
+          )
+          PY
+          fi
+
+      - name: Upload API response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-response-${{ inputs.request_id }}
+          path: api-response/response.json
+          if-no-files-found: error
+          retention-days: 1
