@@ -32,6 +32,8 @@ jobs:
     env:
       QUESTION: ${{ github.event.client_payload.question || inputs.question }}
       REQUEST_ID: ${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
+      REQUEST_TS: ${{ github.event.client_payload.ts || '' }}
+      REQUEST_SIG: ${{ github.event.client_payload.sig || '' }}
 
     steps:
       - name: Checkout
@@ -41,6 +43,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Verify custom API signature
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: python verify_request.py
 
       - name: Install Playwright
         run: |
