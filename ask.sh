@@ -2,83 +2,56 @@
 set -euo pipefail
 
 REPO="${METODBOX_API_REPO:-hanefimert2016-oss/metodbox-on-demand-api}"
-WORKFLOW="on-demand-api.yml"
-BRANCH="main"
+API_KEY_FILE="${METODBOX_API_KEY_FILE:-$HOME/.config/metodbox-proxy/api_key}"
 
-for cmd in gh jq python3; do
+for cmd in gh python3; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Hata: $cmd kurulu değil." >&2
     exit 1
   fi
 done
 
+if [[ ! -s "$API_KEY_FILE" ]]; then
+  echo "Hata: API key dosyası bulunamadı: $API_KEY_FILE" >&2
+  exit 1
+fi
+
 QUESTION="${*:-}"
 if [[ -z "$QUESTION" ]]; then
   read -r -p "Soru: " QUESTION
 fi
 
-REQUEST_ID="$(python3 - <<'PY'
-import uuid
-print(uuid.uuid4())
+REQUEST_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+REQUEST_TS="$(date +%s)"
+API_KEY="$(cat "$API_KEY_FILE")"
+
+REQUEST_SIG="$(
+  API_KEY="$API_KEY"   QUESTION="$QUESTION"   REQUEST_ID="$REQUEST_ID"   REQUEST_TS="$REQUEST_TS"   python3 - <<'PY'
+import hashlib, hmac, os
+msg = f"{os.environ['REQUEST_TS']}\n{os.environ['REQUEST_ID']}\n{os.environ['QUESTION']}".encode()
+print(hmac.new(os.environ["API_KEY"].encode(), msg, hashlib.sha256).hexdigest())
 PY
 )"
 
+unset API_KEY
+
 echo "İstek: $REQUEST_ID" >&2
 
-jq -n   --arg ref "$BRANCH"   --arg question "$QUESTION"   --arg request_id "$REQUEST_ID"   '{ref:$ref, inputs:{question:$question, request_id:$request_id}}' | gh api     --method POST     -H "Accept: application/vnd.github+json"     -H "X-GitHub-Api-Version: 2022-11-28"     "/repos/$REPO/actions/workflows/$WORKFLOW/dispatches"     --input -     >/dev/null
+python3 - <<'PY' > /tmp/metodbox-dispatch.json
+import json, os
+print(json.dumps({
+  "event_type": "metodbox_question",
+  "client_payload": {
+    "question": os.environ["QUESTION"],
+    "request_id": os.environ["REQUEST_ID"],
+    "ts": os.environ["REQUEST_TS"],
+    "sig": os.environ["REQUEST_SIG"],
+  }
+}))
+PY
 
-RUN_ID=""
-for _ in $(seq 1 120); do
-  RUN_ID="$(
-    gh api       -H "Accept: application/vnd.github+json"       "/repos/$REPO/actions/workflows/$WORKFLOW/runs?branch=$BRANCH&event=workflow_dispatch&per_page=50"       --jq ".workflow_runs[] | select(.display_title == \"API Request $REQUEST_ID\") | .id"       | head -n1
-  )"
+gh api   --method POST   -H "Accept: application/vnd.github+json"   -H "X-GitHub-Api-Version: 2022-11-28"   "/repos/$REPO/dispatches"   --input /tmp/metodbox-dispatch.json   >/dev/null
 
-  [[ -n "$RUN_ID" ]] && break
-  sleep 2
-done
+rm -f /tmp/metodbox-dispatch.json
 
-if [[ -z "$RUN_ID" ]]; then
-  echo "Hata: workflow run bulunamadı." >&2
-  exit 1
-fi
-
-echo "Runner: $RUN_ID" >&2
-
-COMPLETED=0
-for _ in $(seq 1 180); do
-  STATUS="$(gh api "/repos/$REPO/actions/runs/$RUN_ID" --jq .status)"
-  if [[ "$STATUS" == "completed" ]]; then
-    COMPLETED=1
-    break
-  fi
-  sleep 3
-done
-
-if [[ "$COMPLETED" != "1" ]]; then
-  echo "Hata: workflow zaman aşımına uğradı." >&2
-  exit 1
-fi
-
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-
-for _ in $(seq 1 30); do
-  if gh run download "$RUN_ID"       --repo "$REPO"       --name "api-response-$REQUEST_ID"       --dir "$TMP/response"       >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-
-if [[ ! -f "$TMP/response/response.json" ]]; then
-  echo "Hata: cevap artifactı indirilemedi." >&2
-  exit 1
-fi
-
-STATUS="$(jq -r '.status' "$TMP/response/response.json")"
-
-if [[ "$STATUS" != "ok" ]]; then
-  jq -r '.error // "Bilinmeyen API hatası"' "$TMP/response/response.json" >&2
-  exit 1
-fi
-
-jq -r '.answer' "$TMP/response/response.json"
+echo "GitHub Actions isteği kabul edildi." >&2
