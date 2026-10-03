@@ -1,110 +1,116 @@
 # Metodbox On-Demand API
 
-GitHub Actions üzerinde çalışan, yalnızca gerçek bir soru geldiğinde geçici runner açan GPT+ köprüsü.
+GitHub Actions üzerinde yalnızca gerçek bir istek geldiğinde geçici runner açan GPT+ köprüsü.
 
-## Mimari
+## Actions Secrets
+
+Bu repo iki secret kullanır:
 
 ```text
-İstemci mesajı
-  |
-  | POST GitHub repository_dispatch
-  v
-GitHub
-  |
-  | mesajı görünce workflow otomatik başlar
-  v
-GitHub Actions Ubuntu runner
-  |
-  v
-Metodbox GPT+ / gpt-5.1
-  |
-  v
-response.json artifact
-  |
-  v
-Runner kapanır
+METODBOX_TOKEN
+API_KEY
 ```
 
-Repo klonlamak gerekmez. Boşta çalışan sunucu, daemon, health-check veya scheduler yoktur.
-
-## Bir kere yapılacak kurulum
-
-Metodbox tokenı yalnızca Actions Secret olarak tutulur:
+Mevcut yerel değerleri GitHub Actions Secrets'a koy:
 
 ```bash
 gh secret set METODBOX_TOKEN \
   --repo hanefimert2016-oss/metodbox-on-demand-api \
   < ~/.config/metodbox-proxy/metodbox_token
+
+gh secret set API_KEY \
+  --repo hanefimert2016-oss/metodbox-on-demand-api \
+  < ~/.config/metodbox-proxy/api_key
 ```
 
-## Mesaj gönderme — repo klonlamadan
+Değerleri görmek zorunda değilsin ve chat'e göndermemelisin.
 
-GitHub'ın sabit REST endpoint'i API girişidir:
+## GitHub tarafındaki API sözleşmesi
+
+`repository_dispatch` payload'ı artık özel API anahtarı ile HMAC-SHA256 imzalanır.
+
+İmza girdisi tam olarak:
 
 ```text
-POST https://api.github.com/repos/hanefimert2016-oss/metodbox-on-demand-api/dispatches
+<unix_timestamp>\n<request_id>\n<question>
 ```
 
-Örnek:
+İmza:
+
+```text
+HMAC-SHA256(API_KEY, yukarıdaki metin)
+```
+
+Dispatch payload:
+
+```json
+{
+  "event_type": "metodbox_question",
+  "client_payload": {
+    "question": "Sadece MERHABA yaz",
+    "request_id": "benzersiz-id",
+    "ts": "unix-timestamp",
+    "sig": "hmac-sha256-hex"
+  }
+}
+```
+
+Workflow, GPT+'ı açmadan önce `sig` değerini `secrets.API_KEY` ile doğrular.
+Beş dakikadan eski istekler replay koruması için reddedilir.
+
+## Akış
+
+```text
+API istemcisi
+  |
+  | Authorization: Bearer <API_KEY>
+  v
+HTTPS ingress
+  |
+  | GitHub kimlik bilgisi ingress içinde gizli
+  | HMAC imzalı repository_dispatch
+  v
+GitHub Actions
+  |
+  | secrets.API_KEY ile imza doğrulama
+  | secrets.METODBOX_TOKEN ile GPT+ oturumu
+  v
+GPT+ / gpt-5.1
+  |
+  v
+response.json artifact
+  |
+  v
+runner kapanır
+```
+
+## Neden yine bir ingress gerekiyor?
+
+GitHub'ın `/repos/.../dispatches` REST endpoint'i kendi GitHub kimlik doğrulamasını zorunlu tutar.
+Bu yüzden `API_KEY` doğrudan GitHub'ın Authorization header'ının yerine geçemez.
+
+Bu repo artık kendi API anahtarımızı doğrulayacak şekilde hazırdır, fakat son kullanıcıya yalnızca:
+
+```text
+URL + API_KEY
+```
+
+göstermek için önünde küçük ve sürekli erişilebilir bir HTTPS ingress bulunmalıdır. Ingress GitHub tokenını
+kullanıcıdan gizler, gelen `API_KEY` değerini doğrular ve GitHub'a imzalı dispatch gönderir.
+
+## Yerel imzalı dispatch testi
+
+`ask.sh` mevcut `~/.config/metodbox-proxy/api_key` dosyasını kullanarak aynı HMAC imzasını üretir.
+Bu yalnızca GitHub tarafındaki imza doğrulamasını test etmek içindir; GitHub endpoint'ine çağrı yaptığı
+için yerel `gh` oturumu gerektirir.
 
 ```bash
-RID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
-
-curl -sS -X POST \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
-  -H "Accept: application/vnd.github+json" \
-  -H "X-GitHub-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/hanefimert2016-oss/metodbox-on-demand-api/dispatches \
-  -d "$(jq -nc \
-    --arg q 'Sadece MERHABA yaz' \
-    --arg id "$RID" \
-    '{event_type:"metodbox_question",client_payload:{question:$q,request_id:$id}}')"
+./ask.sh "Sadece MERHABA yaz"
 ```
 
-Bu HTTP isteği geldiği anda GitHub `repository_dispatch` olayını üretir ve
-`.github/workflows/on-demand-api.yml` otomatik başlar.
+## Güvenlik
 
-## Cevap
-
-Workflow adı:
-
-```text
-API Request <request_id>
-```
-
-Cevap artifact adı:
-
-```text
-api-response-<request_id>
-```
-
-İçinde:
-
-```text
-response.json
-```
-
-bulunur.
-
-GitHub dispatch isteği senkron olarak model cevabını döndürmez. `204 No Content`
-döndürür; model cevabı workflow tamamlandıktan sonra Actions artifact API'sinden alınır.
-
-## Önemli sınır
-
-GitHub Actions, boşta kapalıyken sonradan aynı TCP bağlantısına cevap verebilen bir
-HTTP application server değildir. Bu nedenle saf GitHub-only tasarım asenkrondur:
-
-```text
-POST mesaj -> runner açılır -> result artifact -> GET sonuç
-```
-
-OpenAI uyumlu tek çağrıda `POST /v1/chat/completions -> cevap` davranışı istenirse,
-isteği karşılamak için sürekli erişilebilir bir ingress/proxy gerekir.
-
-## Kota davranışı
-
-- Boştayken GPT+ isteği yok.
-- Model listesi polling'i yok.
-- Schedule yok.
-- Her workflow GPT+'a yalnızca bir kullanıcı mesajı gönderir.
-- Aynı anda yalnızca bir model isteği çalışır.
+- `METODBOX_TOKEN` ve `API_KEY` repoya commit edilmez.
+- Ham API key repository_dispatch payload'ına yazılmaz.
+- Workflow yalnızca HMAC imzasını görür.
+- İstekler 5 dakikalık zaman penceresi ile doğrulanır.
