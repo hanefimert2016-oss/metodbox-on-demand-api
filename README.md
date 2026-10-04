@@ -1,79 +1,73 @@
 # Metodbox On-Demand API
 
-Cloudflare kaldırıldı. Yeni mimari manuel açılan **local gateway + GitHub Actions** yapısıdır.
+Bu sürümde API **GitHub Actions runner üzerinde** çalışır. PC'de veya Cloudflare'da sürekli açık servis yoktur.
+
+## Çalışma şekli
 
 ```text
-Cline
-  -> http://127.0.0.1:8787/v1
-  -> local gateway (yalnız sen açınca çalışır)
-  -> GitHub App installation token
-  -> GitHub Actions
-  -> GPT+ (gpt-5.1 / gpt-oss:120b)
-  -> response.json artifact
-  -> local gateway
-  -> Cline
+Manuel "Run workflow"
+veya ChatGPT'ye "API'yi başlat" de
+        ↓
+GitHub Actions Ubuntu runner açılır
+        ↓
+FastAPI + GPT+ bridge başlar
+        ↓
+geçici HTTPS tunnel URL oluşur
+        ↓
+Cline bu URL + API_KEY ile kullanır
+        ↓
+workflow durunca runner ve API kapanır
 ```
 
-## 1. GitHub Actions secrets
+Dışarıdan GitHub-hosted runner'a doğrudan inbound port açılamadığı için, yalnız workflow çalışırken kısa ömürlü HTTPS tüneli kullanılır. Tünel `localhost.run` üzerinden kurulur; ücretsiz geçici URL her başlatmada değişebilir.
 
-Repoda şu secretlar bulunmalı:
+## Secrets
+
+GitHub Actions Secrets içinde yalnızca:
 
 ```text
 API_KEY
 METODBOX_TOKEN
 ```
 
-## 2. Local gateway'i bir kere yapılandır
+gerekir.
 
-Repoda:
+## Manuel başlatma
 
-```bash
-cd local-gateway
-chmod +x configure.sh start.sh
-./configure.sh
-```
+GitHub → Actions → **Manual API Server** → **Run workflow**
 
-Burada GitHub App ID, Installation ID ve GitHub App private key PEM dosyasının yolu sorulur.
-Değerler `~/.config/metodbox-on-demand-api/` altında tutulur.
+`lifetime_minutes` varsayılan 120 dakikadır. En fazla 350 dakika tutulur.
 
-## 3. API'yi istediğin zaman aç
-
-```bash
-./start.sh
-```
-
-API:
+Workflow başladıktan sonra **Open temporary HTTPS tunnel** adımında ve workflow summary'de:
 
 ```text
-http://127.0.0.1:8787/v1
+https://....localhost.run/v1
 ```
+
+şeklinde Base URL görünür.
 
 Cline ayarları:
 
 ```text
-Base URL: http://127.0.0.1:8787/v1
-API Key: ~/.config/metodbox-proxy/api_key içindeki değer
+Base URL: https://....localhost.run/v1
+API Key: mevcut API_KEY
 Model: gpt-5.1 veya gpt-oss:120b
 ```
 
-`Ctrl+C` yaptığında local API kapanır. Boşta Cloudflare Worker, VPS veya sürekli açık servis yoktur.
+## ChatGPT ile başlat / durdur
 
-## Model listesi
+Bu repo ayrıca issue tabanlı kontrol destekler.
 
-```bash
-curl http://127.0.0.1:8787/v1/models
+ChatGPT'ye:
+
+```text
+API'yi başlat
 ```
 
-## Test
+dediğinde `[START API]` başlıklı bir GitHub issue oluşturulabilir. Workflow otomatik başlar ve hazır olduğunda geçici Base URL'yi issue'ya yorum olarak yazar.
 
-```bash
-KEY="$(cat ~/.config/metodbox-proxy/api_key)"
+Sunucuyu durdurmak için aynı issue kapatılır. Workflow bunu algılar ve runner kapanır.
 
-curl -sS http://127.0.0.1:8787/v1/chat/completions \
-  -H "Authorization: Bearer $KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model":"gpt-oss:120b",
-    "messages":[{"role":"user","content":"Sadece MERHABA yaz"}]
-  }'
-```
+## Güvenlik
+
+Public tunnel yalnız workflow açıkken vardır. Chat istekleri `Authorization: Bearer <API_KEY>` ile korunur. `METODBOX_TOKEN` yalnız GitHub Actions Secret olarak runner'a verilir.
