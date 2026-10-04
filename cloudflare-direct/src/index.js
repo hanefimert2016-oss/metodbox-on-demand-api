@@ -401,8 +401,14 @@ async function getAuth(env, force = false) {
 }
 
 async function callGptPlus(env, body, forceRefresh = false) {
-  // Final guard for every route: never send tool_choice/parallel_tool_calls
-  // unless at least one actual tool is present.
+  // Final protocol guard for every route. OpenHands/LiteLLM can compact or
+  // replay tool history in a shape GPT+ rejects. Normalize immediately before
+  // the upstream request so both /chat/completions and /responses are covered.
+  if (Array.isArray(body?.messages)) {
+    body = { ...body, messages: normalizeToolHistory(body.messages) };
+  }
+
+  // Never send tool_choice/parallel_tool_calls unless actual tools exist.
   body = sanitizeToolFields(body);
 
   const auth = await getAuth(env, forceRefresh);
@@ -442,12 +448,14 @@ function responseContentToText(content) {
 }
 
 function responsesInputToMessages(body, initialMessages = []) {
-  const messages = Array.isArray(initialMessages)
-    ? initialMessages.map((m) => ({ ...m }))
-    : [];
+  const messages = [];
 
   if (typeof body.instructions === "string" && body.instructions.trim()) {
     messages.push({ role: "system", content: body.instructions });
+  }
+
+  if (Array.isArray(initialMessages)) {
+    messages.push(...initialMessages.map((m) => ({ ...m })));
   }
 
   const input = body.input;
@@ -478,12 +486,21 @@ function responsesInputToMessages(body, initialMessages = []) {
       // forwarding an orphan role=tool would make Chat Completions reject the
       // whole request. Preserve the result as a user-visible tool-result
       // message unless the matching assistant tool_call is present here.
-      const hasMatchingToolCall = messages.some(
-        (m) =>
-          m?.role === "assistant" &&
-          Array.isArray(m.tool_calls) &&
-          m.tool_calls.some((tc) => tc?.id === callId)
-      );
+      let hasMatchingToolCall = false;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const previous = messages[i];
+
+        if (previous?.role === "tool") continue;
+
+        if (
+          previous?.role === "assistant" &&
+          Array.isArray(previous.tool_calls) &&
+          previous.tool_calls.some((tc) => tc?.id === callId)
+        ) {
+          hasMatchingToolCall = true;
+        }
+        break;
+      }
 
       if (hasMatchingToolCall) {
         messages.push({
@@ -873,7 +890,7 @@ export default {
         service: "metodbox-direct-worker",
         models: MODELS,
         mode: "cloudflare-browser-run",
-        build: "openhands-tool-history-fix-v3",
+        build: "openhands-tool-history-fix-v4",
       });
     }
 
