@@ -315,14 +315,36 @@ function responsesInputToMessages(body) {
     if (!item || typeof item !== "object") continue;
 
     if (item.type === "function_call_output") {
-      messages.push({
-        role: "tool",
-        tool_call_id: item.call_id || item.id || "",
-        content:
-          typeof item.output === "string"
-            ? item.output
-            : JSON.stringify(item.output ?? ""),
-      });
+      const callId = item.call_id || item.id || "";
+      const content =
+        typeof item.output === "string"
+          ? item.output
+          : JSON.stringify(item.output ?? "");
+
+      // Responses API clients may send only function_call_output in the next
+      // request and rely on previous_response_id. Our bridge is stateless, so
+      // forwarding an orphan role=tool would make Chat Completions reject the
+      // whole request. Preserve the result as a user-visible tool-result
+      // message unless the matching assistant tool_call is present here.
+      const hasMatchingToolCall = messages.some(
+        (m) =>
+          m?.role === "assistant" &&
+          Array.isArray(m.tool_calls) &&
+          m.tool_calls.some((tc) => tc?.id === callId)
+      );
+
+      if (hasMatchingToolCall) {
+        messages.push({
+          role: "tool",
+          tool_call_id: callId,
+          content,
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: `[Tool result${callId ? ` ${callId}` : ""}]\n${content}`,
+        });
+      }
       continue;
     }
 
@@ -408,6 +430,76 @@ function responsesToolChoiceToChat(choice) {
   return choice;
 }
 
+function toolParametersForRequest(requestBody, toolName) {
+  if (!Array.isArray(requestBody?.tools)) return null;
+
+  for (const tool of requestBody.tools) {
+    if (!tool || typeof tool !== "object") continue;
+
+    if (tool.type === "function" && tool.function?.name === toolName) {
+      return tool.function.parameters || null;
+    }
+
+    if (tool.type === "function" && tool.name === toolName) {
+      return tool.parameters || null;
+    }
+  }
+
+  return null;
+}
+
+function coerceSingleChoiceValues(value, schema) {
+  if (!schema || typeof schema !== "object") return value;
+
+  if (Object.prototype.hasOwnProperty.call(schema, "const")) {
+    return schema.const;
+  }
+
+  if (Array.isArray(schema.enum) && schema.enum.length === 1) {
+    return schema.enum[0];
+  }
+
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    schema.properties &&
+    typeof schema.properties === "object"
+  ) {
+    const out = { ...value };
+    for (const [key, childSchema] of Object.entries(schema.properties)) {
+      if (Object.prototype.hasOwnProperty.call(out, key)) {
+        out[key] = coerceSingleChoiceValues(out[key], childSchema);
+      }
+    }
+    return out;
+  }
+
+  if (Array.isArray(value) && schema.items) {
+    return value.map((item) => coerceSingleChoiceValues(item, schema.items));
+  }
+
+  return value;
+}
+
+function sanitizeToolArguments(toolName, rawArguments, requestBody) {
+  const raw =
+    typeof rawArguments === "string"
+      ? rawArguments
+      : JSON.stringify(rawArguments ?? {});
+
+  const schema = toolParametersForRequest(requestBody, toolName);
+  if (!schema) return raw;
+
+  try {
+    const parsed = JSON.parse(raw || "{}");
+    const fixed = coerceSingleChoiceValues(parsed, schema);
+    return JSON.stringify(fixed);
+  } catch (_) {
+    return raw;
+  }
+}
+
 function chatCompletionToResponse(chat, requestBody, model) {
   const choice = chat?.choices?.[0] || {};
   const message = choice.message || {};
@@ -439,10 +531,11 @@ function chatCompletionToResponse(chat, requestBody, model) {
         status: "completed",
         call_id: call.id || `call_${crypto.randomUUID()}`,
         name: call.function?.name || "",
-        arguments:
-          typeof call.function?.arguments === "string"
-            ? call.function.arguments
-            : JSON.stringify(call.function?.arguments ?? {}),
+        arguments: sanitizeToolArguments(
+          call.function?.name || "",
+          call.function?.arguments,
+          requestBody
+        ),
       });
     }
   }
