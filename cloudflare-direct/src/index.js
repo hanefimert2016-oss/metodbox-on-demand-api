@@ -7,6 +7,8 @@ const AUTH_KEY = "gptplus_auth_v1";
 const AUTH_LOCK_KEY = "gptplus_auth_refresh_lock_v1";
 const AUTH_TTL_SECONDS = 7 * 24 * 60 * 60;
 const AUTH_LOCK_TTL_SECONDS = 65;
+const RESPONSE_CTX_PREFIX = "response_ctx:";
+const RESPONSE_CTX_TTL_SECONDS = 6 * 60 * 60;
 
 let refreshPromise = null;
 
@@ -291,8 +293,10 @@ function responseContentToText(content) {
     .join("\n");
 }
 
-function responsesInputToMessages(body) {
-  const messages = [];
+function responsesInputToMessages(body, initialMessages = []) {
+  const messages = Array.isArray(initialMessages)
+    ? initialMessages.map((m) => ({ ...m }))
+    : [];
 
   if (typeof body.instructions === "string" && body.instructions.trim()) {
     messages.push({ role: "system", content: body.instructions });
@@ -428,6 +432,45 @@ function responsesToolChoiceToChat(choice) {
   }
 
   return choice;
+}
+
+async function loadPreviousResponseContext(env, previousResponseId) {
+  if (!previousResponseId) return [];
+
+  try {
+    const raw = await env.AUTH_KV.get(`${RESPONSE_CTX_PREFIX}${previousResponseId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.messages) ? parsed.messages : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+async function saveResponseContext(env, responseId, messages, chat) {
+  if (!responseId || !Array.isArray(messages)) return;
+
+  const assistant = chat?.choices?.[0]?.message;
+  if (!assistant || typeof assistant !== "object") return;
+
+  const assistantMessage = {
+    role: "assistant",
+    content: assistant.content ?? "",
+  };
+
+  if (Array.isArray(assistant.tool_calls) && assistant.tool_calls.length > 0) {
+    assistantMessage.tool_calls = assistant.tool_calls;
+  }
+
+  try {
+    await env.AUTH_KV.put(
+      `${RESPONSE_CTX_PREFIX}${responseId}`,
+      JSON.stringify({ messages: [...messages, assistantMessage] }),
+      { expirationTtl: RESPONSE_CTX_TTL_SECONDS }
+    );
+  } catch (error) {
+    console.log("[responses] context cache write failed", String(error));
+  }
 }
 
 function toolParametersForRequest(requestBody, toolName) {
@@ -844,7 +887,11 @@ export default {
         );
       }
 
-      const messages = responsesInputToMessages(body);
+      const previousMessages = await loadPreviousResponseContext(
+        env,
+        body.previous_response_id
+      );
+      const messages = responsesInputToMessages(body, previousMessages);
       if (!messages.length) {
         return json(
           {
@@ -934,6 +981,7 @@ export default {
 
         const chat = await upstream.json();
         const responseObject = chatCompletionToResponse(chat, body, model);
+        await saveResponseContext(env, responseObject.id, messages, chat);
 
         if (body.stream === true) {
           return responsesSse(responseObject);
