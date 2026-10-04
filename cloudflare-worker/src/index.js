@@ -110,17 +110,30 @@ export default {
       const run = await waitForRun(installationToken, requestId);
       const finished = await waitForCompletion(installationToken, run.id);
 
+      let answer;
+      try {
+        // Always inspect response.json first. Even failed workflows upload a
+        // structured error artifact, which is much more useful than a generic
+        // "workflow failure" message.
+        answer = await readResultArtifact(
+          installationToken,
+          finished.id,
+          requestId
+        );
+      } catch (artifactError) {
+        if (finished.conclusion !== "success") {
+          throw new Error(
+            `GitHub Actions ${finished.conclusion || "unknown"}: ${artifactError?.message || artifactError}`
+          );
+        }
+        throw artifactError;
+      }
+
       if (finished.conclusion !== "success") {
         throw new Error(
           `GitHub Actions tamamlandı fakat sonuç: ${finished.conclusion || "unknown"}`
         );
       }
-
-      const answer = await readResultArtifact(
-        installationToken,
-        finished.id,
-        requestId
-      );
 
       const created = Math.floor(Date.now() / 1000);
 
