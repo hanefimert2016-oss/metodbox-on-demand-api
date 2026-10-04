@@ -169,7 +169,9 @@ export default {
 
     if (
       request.method === "GET" &&
-      (url.pathname === "/models" || url.pathname === "/v1/models")
+      (url.pathname === "/models" ||
+        url.pathname === "/v1/models" ||
+        url.pathname.endsWith("/models"))
     ) {
       return json({
         object: "list",
@@ -188,7 +190,8 @@ export default {
     if (
       request.method === "POST" &&
       (url.pathname === "/chat/completions" ||
-        url.pathname === "/v1/chat/completions")
+        url.pathname === "/v1/chat/completions" ||
+        url.pathname.endsWith("/chat/completions"))
     ) {
       if (!validApiKey(request, env)) {
         return json(
@@ -301,6 +304,14 @@ export default {
       }
     }
 
-    return json({ error: { message: "Not found" } }, 404);
+    return json(
+      {
+        error: {
+          message: `Not found: ${request.method} ${url.pathname}`,
+          type: "not_found_error",
+        },
+      },
+      404
+    );
   },
 };
