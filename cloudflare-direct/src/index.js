@@ -122,6 +122,52 @@ function normalizeModel(value) {
   return MODELS.includes(model) ? model : null;
 }
 
+function normalizeToolHistory(messages) {
+  if (!Array.isArray(messages)) return messages;
+  const out = [];
+  let allowed = new Set();
+
+  for (const original of messages) {
+    if (!original || typeof original !== "object") continue;
+    const m = { ...original };
+
+    if (m.role === "assistant") {
+      allowed = new Set(
+        (Array.isArray(m.tool_calls) ? m.tool_calls : [])
+          .map((x) => x && x.id)
+          .filter(Boolean)
+      );
+      out.push(m);
+      continue;
+    }
+
+    if (m.role === "tool") {
+      let id = m.tool_call_id || "";
+      if (!id && allowed.size === 1) id = [...allowed][0];
+
+      if (id && allowed.has(id)) {
+        out.push({ ...m, tool_call_id: id });
+        allowed.delete(id);
+      } else {
+        const value =
+          typeof m.content === "string"
+            ? m.content
+            : JSON.stringify(m.content ?? "");
+        out.push({
+          role: "user",
+          content: "[Tool result" + (id ? " " + id : "") + "]\n" + value,
+        });
+      }
+      continue;
+    }
+
+    allowed = new Set();
+    out.push(m);
+  }
+
+  return out;
+}
+
 function sanitizeToolFields(body) {
   const out = { ...body };
   const hasTools = Array.isArray(out.tools) && out.tools.length > 0;
@@ -802,6 +848,7 @@ export default {
       }
 
       body.model = model;
+      body.messages = normalizeToolHistory(body.messages);
       body = sanitizeToolFields(body);
 
       try {
