@@ -10,7 +10,8 @@ from urllib.parse import quote
 from playwright.async_api import async_playwright
 
 BASE = "https://gptplus.metodbox.ai"
-MODEL = "gpt-5.1"
+MODEL = os.environ.get("MODEL", "gpt-5.1").strip() or "gpt-5.1"
+SUPPORTED_MODELS = {"gpt-5.1", "gpt-oss:120b"}
 QUESTION = os.environ.get("QUESTION", "").strip()
 REQUEST_ID = os.environ.get("REQUEST_ID", "").strip()
 TOKEN = os.environ.get("METODBOX_TOKEN", "").strip()
@@ -44,6 +45,70 @@ async def find_chat_input(page):
         except Exception:
             pass
     raise RuntimeError("GPT+ chat input bulunamadı")
+
+async def select_model(page, model):
+    if model not in SUPPORTED_MODELS:
+        raise RuntimeError(f"Unsupported model: {model}")
+
+    if model == "gpt-5.1":
+        return
+
+    # GPT+ is Open WebUI-derived. Try common model-selector shapes.
+    openers = [
+        'button:has-text("gpt-5.1")',
+        '[role="button"]:has-text("gpt-5.1")',
+        'button[aria-label*="model" i]',
+        '[data-testid*="model" i]',
+    ]
+
+    opened = False
+    for selector in openers:
+        locator = page.locator(selector).first
+        try:
+            if await locator.is_visible(timeout=1500):
+                await locator.click()
+                opened = True
+                break
+        except Exception:
+            pass
+
+    if not opened:
+        # Fall back to exact visible model text before any chat messages exist.
+        locator = page.get_by_text("gpt-5.1", exact=True).first
+        try:
+            await locator.wait_for(state="visible", timeout=5000)
+            await locator.click()
+            opened = True
+        except Exception:
+            pass
+
+    if not opened:
+        raise RuntimeError("GPT+ model selector could not be opened")
+
+    options = [
+        f'[role="option"]:has-text("{model}")',
+        f'button:has-text("{model}")',
+        f'[role="menuitem"]:has-text("{model}")',
+    ]
+
+    for selector in options:
+        locator = page.locator(selector).last
+        try:
+            await locator.wait_for(state="visible", timeout=4000)
+            await locator.click()
+            await page.wait_for_timeout(800)
+            return
+        except Exception:
+            pass
+
+    locator = page.get_by_text(model, exact=True).last
+    try:
+        await locator.wait_for(state="visible", timeout=5000)
+        await locator.click()
+        await page.wait_for_timeout(800)
+        return
+    except Exception:
+        raise RuntimeError(f"GPT+ model option not found: {model}")
 
 
 async def wait_for_answer(page, before_count, timeout_s=180):
@@ -81,6 +146,18 @@ async def wait_for_answer(page, before_count, timeout_s=180):
 
 async def run():
     started = now()
+
+    if MODEL not in SUPPORTED_MODELS:
+        save({
+            "status": "error",
+            "request_id": REQUEST_ID,
+            "model": MODEL,
+            "answer": "",
+            "error": f"Unsupported model: {MODEL}",
+            "started_at": started,
+            "finished_at": now(),
+        })
+        return 2
 
     if not REQUEST_ID:
         save({
@@ -139,6 +216,7 @@ async def run():
             )
 
             chat = await find_chat_input(page)
+            await select_model(page, MODEL)
             messages = page.locator('[id^="message-"]')
             before = await messages.count()
 
