@@ -1,7 +1,8 @@
 const OWNER = "hanefimert2016-oss";
 const REPO = "metodbox-on-demand-api";
 const WORKFLOW = "on-demand-api.yml";
-const MODEL = "gpt-5.1";
+const DEFAULT_MODEL = "gpt-5.1";
+const MODELS = ["gpt-5.1", "gpt-oss:120b"];
 const API_VERSION = "2026-03-10";
 const POLL_MS = 2000;
 const START_TIMEOUT_MS = 90_000;
@@ -26,7 +27,8 @@ export default {
         return json({
           ok: true,
           service: "metodbox-on-demand-api",
-          model: MODEL,
+          model: DEFAULT_MODEL,
+          models: MODELS,
           openai_compatible: true,
         });
       }
@@ -42,15 +44,15 @@ export default {
         // base URL already ends with /v1.
         return json({
           object: "list",
-          data: [{
-            id: MODEL,
+          data: MODELS.map((id) => ({
+            id,
             object: "model",
             created: 0,
-            owned_by: "metodbox",
+            owned_by: id === "gpt-oss:120b" ? "ollama" : "openai",
             permission: [],
-            root: MODEL,
+            root: id,
             parent: null,
-          }],
+          })),
         });
       }
 
@@ -69,11 +71,20 @@ export default {
         return json({ error: { message: "messages içinde kullanıcı mesajı bulunamadı" } }, 400);
       }
 
+      const requestedModel = normalizeModel(body.model);
+      if (!requestedModel) {
+        return json({
+          error: {
+            message: `Desteklenmeyen model: ${String(body.model || "")}. Desteklenenler: ${MODELS.join(", ")}`
+          }
+        }, 400);
+      }
+
       const requestId = crypto.randomUUID();
       const ts = Math.floor(Date.now() / 1000).toString();
       const sig = await hmacSha256Hex(
         env.API_KEY,
-        `${ts}\n${requestId}\n${question}`
+        `${ts}\n${requestId}\n${requestedModel}\n${question}`
       );
 
       const installationToken = await getInstallationToken(env);
@@ -87,6 +98,7 @@ export default {
             event_type: "metodbox_question",
             client_payload: {
               question,
+              model: requestedModel,
               request_id: requestId,
               ts,
               sig,
@@ -117,7 +129,7 @@ export default {
           id: `chatcmpl-${requestId}`,
           object: "chat.completion.chunk",
           created,
-          model: MODEL,
+          model: requestedModel,
           choices: [{
             index: 0,
             delta: { role: "assistant", content: answer },
@@ -128,7 +140,7 @@ export default {
           id: `chatcmpl-${requestId}`,
           object: "chat.completion.chunk",
           created,
-          model: MODEL,
+          model: requestedModel,
           choices: [{
             index: 0,
             delta: {},
@@ -152,7 +164,7 @@ export default {
         id: `chatcmpl-${requestId}`,
         object: "chat.completion",
         created,
-        model: MODEL,
+        model: requestedModel,
         choices: [{
           index: 0,
           message: {
@@ -216,6 +228,19 @@ function timingSafeEqual(a, b) {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
+}
+
+function normalizeModel(value) {
+  const raw = String(value || DEFAULT_MODEL).trim();
+  const aliases = {
+    "gpt-5.1": "gpt-5.1",
+    "gpt5.1": "gpt-5.1",
+    "gpt-oss:120b": "gpt-oss:120b",
+    "gpt-oss-120b": "gpt-oss:120b",
+    "gpt-oss-120B": "gpt-oss:120b",
+  };
+  const normalized = aliases[raw] || aliases[raw.toLowerCase()];
+  return MODELS.includes(normalized) ? normalized : null;
 }
 
 function extractUserMessage(body) {
