@@ -1,73 +1,69 @@
 # Metodbox On-Demand API
 
-Bu sürümde API **GitHub Actions runner üzerinde** çalışır. PC'de veya Cloudflare'da sürekli açık servis yoktur.
+API **GitHub Actions runner üzerinde** çalışır. PC'de veya Cloudflare'da sürekli açık servis yoktur.
 
-## Çalışma şekli
+## Sabit URL
+
+Workflow artık geçici `localhost.run` adresi yerine ngrok'un hesaba atanmış sabit development domainini kullanır.
+
+Örnek:
 
 ```text
-Manuel "Run workflow"
-veya ChatGPT'ye "API'yi başlat" de
-        ↓
-GitHub Actions Ubuntu runner açılır
-        ↓
-FastAPI + GPT+ bridge başlar
-        ↓
-geçici HTTPS tunnel URL oluşur
-        ↓
-Cline bu URL + API_KEY ile kullanır
-        ↓
-workflow durunca runner ve API kapanır
+https://ornek-adres.ngrok.app/v1
 ```
 
-Dışarıdan GitHub-hosted runner'a doğrudan inbound port açılamadığı için, yalnız workflow çalışırken kısa ömürlü HTTPS tüneli kullanılır. Tünel `localhost.run` üzerinden kurulur; ücretsiz geçici URL her başlatmada değişebilir.
+Bu adres Cline'a bir kez girilir. Workflow kapalıyken URL offline olur; API tekrar başlatıldığında **aynı URL** yeniden çalışır.
 
-## Secrets
+ngrok'un resmi dokümantasyonuna göre ücretsiz hesaplara atanmış development domain tekrar kullanılabilir ve agent endpoint'i yalnız agent çalışırken aktiftir.
 
-GitHub Actions Secrets içinde yalnızca:
+## Gerekli GitHub Actions Secrets
 
 ```text
 API_KEY
 METODBOX_TOKEN
+NGROK_AUTHTOKEN
+NGROK_DOMAIN
 ```
 
-gerekir.
+`NGROK_DOMAIN` şu biçimlerden biri olabilir:
+
+```text
+ornek-adres.ngrok.app
+```
+
+veya:
+
+```text
+https://ornek-adres.ngrok.app
+```
+
+## Bir kere ngrok kurulumu
+
+1. ngrok hesabı oluştur.
+2. Dashboard → Domains bölümünde hesabına atanmış development/static domaini al.
+3. Dashboard'dan authtoken al.
+4. Bunları GitHub Actions Secrets olarak kaydet:
+   - `NGROK_AUTHTOKEN`
+   - `NGROK_DOMAIN`
 
 ## Manuel başlatma
 
 GitHub → Actions → **Manual API Server** → **Run workflow**
 
-`lifetime_minutes` varsayılan 120 dakikadır. En fazla 350 dakika tutulur.
+Varsayılan açık kalma süresi 120 dakika, üst sınır 350 dakikadır.
 
-Workflow başladıktan sonra **Open temporary HTTPS tunnel** adımında ve workflow summary'de:
-
-```text
-https://....localhost.run/v1
-```
-
-şeklinde Base URL görünür.
-
-Cline ayarları:
+Cline ayarları her başlatmada aynıdır:
 
 ```text
-Base URL: https://....localhost.run/v1
+Base URL: https://<NGROK_DOMAIN>/v1
 API Key: mevcut API_KEY
 Model: gpt-5.1 veya gpt-oss:120b
 ```
 
 ## ChatGPT ile başlat / durdur
 
-Bu repo ayrıca issue tabanlı kontrol destekler.
+ChatGPT'ye `API'yi başlat` dediğinde `[START API]` kontrol issue'su oluşturulabilir ve workflow başlar. Hazır olduğunda issue'ya aynı sabit Base URL yazılır.
 
-ChatGPT'ye:
+`API'yi kapat` dediğinde issue kapatılır ve GitHub runner kapanır.
 
-```text
-API'yi başlat
-```
-
-dediğinde `[START API]` başlıklı bir GitHub issue oluşturulabilir. Workflow otomatik başlar ve hazır olduğunda geçici Base URL'yi issue'ya yorum olarak yazar.
-
-Sunucuyu durdurmak için aynı issue kapatılır. Workflow bunu algılar ve runner kapanır.
-
-## Güvenlik
-
-Public tunnel yalnız workflow açıkken vardır. Chat istekleri `Authorization: Bearer <API_KEY>` ile korunur. `METODBOX_TOKEN` yalnız GitHub Actions Secret olarak runner'a verilir.
+Workflow kapalı olduğunda sabit URL cevap vermez; sonraki başlatmada aynı hostname tekrar kullanılır.
