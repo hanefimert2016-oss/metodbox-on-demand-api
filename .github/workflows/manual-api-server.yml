@@ -31,6 +31,8 @@ jobs:
     env:
       API_KEY: ${{ secrets.API_KEY }}
       METODBOX_TOKEN: ${{ secrets.METODBOX_TOKEN }}
+      NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
+      NGROK_DOMAIN: ${{ secrets.NGROK_DOMAIN }}
       CONTROL_ISSUE: ${{ github.event.issue.number || '' }}
       GH_TOKEN: ${{ github.token }}
 
@@ -50,7 +52,11 @@ jobs:
 
       - name: Start API server
         run: |
-          nohup python -m uvicorn server:app             --app-dir github-runtime             --host 127.0.0.1             --port 8787             > /tmp/metodbox-api.log 2>&1 &
+          nohup python -m uvicorn server:app \
+            --app-dir github-runtime \
+            --host 127.0.0.1 \
+            --port 8787 \
+            > /tmp/metodbox-api.log 2>&1 &
           echo $! > /tmp/metodbox-api.pid
 
           for i in $(seq 1 120); do
@@ -65,24 +71,52 @@ jobs:
           cat /tmp/metodbox-api.log || true
           exit 1
 
-      - name: Open temporary HTTPS tunnel
+      - name: Open fixed HTTPS tunnel
         id: tunnel
         run: |
+          if [ -z "$NGROK_AUTHTOKEN" ]; then
+            echo "NGROK_AUTHTOKEN Actions secret eksik."
+            exit 1
+          fi
+
+          if [ -z "$NGROK_DOMAIN" ]; then
+            echo "NGROK_DOMAIN Actions secret eksik."
+            exit 1
+          fi
+
+          curl -fsSL https://bin.ngrok.com/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz \
+            | tar -xz
+          chmod +x ./ngrok
+
+          DOMAIN="${NGROK_DOMAIN#https://}"
+          DOMAIN="${DOMAIN#http://}"
+          URL="https://$DOMAIN"
+
           : > /tmp/tunnel.log
-          nohup ssh             -o StrictHostKeyChecking=no             -o UserKnownHostsFile=/dev/null             -o ServerAliveInterval=30             -o ServerAliveCountMax=3             -o ExitOnForwardFailure=yes             -R 80:127.0.0.1:8787             nokey@localhost.run             > /tmp/tunnel.log 2>&1 &
+          nohup ./ngrok http 8787 \
+            --authtoken "$NGROK_AUTHTOKEN" \
+            --url "$URL" \
+            --log stdout \
+            > /tmp/tunnel.log 2>&1 &
           echo $! > /tmp/tunnel.pid
 
-          URL=""
           for i in $(seq 1 90); do
-            URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.localhost\.run' /tmp/tunnel.log | tail -n1 || true)"
-            if [ -n "$URL" ]; then
+            if curl -fsS "$URL/health" >/dev/null 2>&1; then
+              echo "Fixed ngrok URL ready."
               break
             fi
+
+            if ! kill -0 "$(cat /tmp/tunnel.pid)" 2>/dev/null; then
+              echo "ngrok process durdu."
+              cat /tmp/tunnel.log || true
+              exit 1
+            fi
+
             sleep 2
           done
 
-          if [ -z "$URL" ]; then
-            echo "Tunnel URL alınamadı."
+          if ! curl -fsS "$URL/health" >/dev/null 2>&1; then
+            echo "Sabit ngrok URL hazır olmadı: $URL"
             cat /tmp/tunnel.log || true
             exit 1
           fi
@@ -93,15 +127,17 @@ jobs:
           {
             echo "## Metodbox API açık"
             echo
-            echo "**Base URL:** `$URL/v1`"
+            echo "**Sabit Base URL:** `$URL/v1`"
             echo
             echo "**Models:** `gpt-5.1`, `gpt-oss:120b`"
             echo
-            echo "Bu workflow durunca URL de kapanır."
+            echo "Workflow durunca aynı URL offline olur; sonraki başlatmada yine aynı URL açılır."
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ -n "$CONTROL_ISSUE" ]; then
-            gh issue comment "$CONTROL_ISSUE"               --repo "${{ github.repository }}"               --body "API hazır. Base URL: `$URL/v1` — Modeller: `gpt-5.1`, `gpt-oss:120b`. Bu issue kapatılınca sunucu kapanacak."
+            gh issue comment "$CONTROL_ISSUE" \
+              --repo "${{ github.repository }}" \
+              --body "API hazır. Sabit Base URL: `$URL/v1` — Modeller: `gpt-5.1`, `gpt-oss:120b`. Issue kapanınca sunucu kapanır; sonraki başlatmada URL değişmez."
           fi
 
           echo "API URL: $URL/v1"
@@ -160,5 +196,7 @@ jobs:
           [ -f /tmp/metodbox-api.pid ] && kill "$(cat /tmp/metodbox-api.pid)" 2>/dev/null || true
 
           if [ -n "$CONTROL_ISSUE" ]; then
-            gh issue comment "$CONTROL_ISSUE"               --repo "${{ github.repository }}"               --body "API kapandı." || true
+            gh issue comment "$CONTROL_ISSUE" \
+              --repo "${{ github.repository }}" \
+              --body "API kapandı. Sabit URL sonraki başlatmada aynı kalacak." || true
           fi
