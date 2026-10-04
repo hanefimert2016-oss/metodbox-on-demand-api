@@ -114,6 +114,19 @@ function normalizeModel(value) {
   return MODELS.includes(model) ? model : null;
 }
 
+function sanitizeToolFields(body) {
+  const out = { ...body };
+  const hasTools = Array.isArray(out.tools) && out.tools.length > 0;
+
+  if (!hasTools) {
+    delete out.tools;
+    delete out.tool_choice;
+    delete out.parallel_tool_calls;
+  }
+
+  return out;
+}
+
 function validApiKey(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const bearer = auth.toLowerCase().startsWith("bearer ")
@@ -643,6 +656,7 @@ export default {
       }
 
       body.model = model;
+      body = sanitizeToolFields(body);
 
       try {
         const upstream = await callGptPlus(env, body);
@@ -747,10 +761,16 @@ export default {
       };
 
       const tools = responsesToolsToChatTools(body.tools);
-      if (tools) chatBody.tools = tools;
+      if (tools && tools.length > 0) {
+        chatBody.tools = tools;
 
-      const toolChoice = responsesToolChoiceToChat(body.tool_choice);
-      if (toolChoice !== undefined) chatBody.tool_choice = toolChoice;
+        const toolChoice = responsesToolChoiceToChat(body.tool_choice);
+        if (toolChoice !== undefined) chatBody.tool_choice = toolChoice;
+
+        if (body.parallel_tool_calls !== undefined) {
+          chatBody.parallel_tool_calls = body.parallel_tool_calls;
+        }
+      }
 
       for (const key of [
         "temperature",
@@ -758,7 +778,6 @@ export default {
         "seed",
         "frequency_penalty",
         "presence_penalty",
-        "parallel_tool_calls",
       ]) {
         if (body[key] !== undefined) chatBody[key] = body[key];
       }
