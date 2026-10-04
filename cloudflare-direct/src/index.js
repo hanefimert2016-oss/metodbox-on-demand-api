@@ -4,9 +4,85 @@ const GPTPLUS = "https://gptplus.metodbox.ai";
 const DEFAULT_MODEL = "gpt-5.1";
 const MODELS = ["gpt-5.1", "gpt-oss:120b"];
 const AUTH_KEY = "gptplus_auth_v1";
-const AUTH_TTL_SECONDS = 6 * 60 * 60;
+const AUTH_LOCK_KEY = "gptplus_auth_refresh_lock_v1";
+const AUTH_TTL_SECONDS = 7 * 24 * 60 * 60;
+const AUTH_LOCK_TTL_SECONDS = 65;
 
 let refreshPromise = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isBrowserRateLimit(error) {
+  return (
+    error?.status === 429 ||
+    String(error?.message || error).includes("429") ||
+    String(error?.message || error).toLowerCase().includes("rate limit exceeded")
+  );
+}
+
+function isDailyBrowserLimit(error) {
+  return String(error?.message || error)
+    .toLowerCase()
+    .includes("browser time limit exceeded");
+}
+
+function retryAfterMs(error, fallbackMs = 21_000) {
+  try {
+    const raw = error?.headers?.get?.("Retry-After");
+    const seconds = Number(raw);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(Math.max(seconds * 1000 + 500, 1000), 30_000);
+    }
+  } catch (_) {}
+  return fallbackMs;
+}
+
+async function launchBrowserWithBackoff(env) {
+  let lastError;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await puppeteer.launch(env.BROWSER);
+    } catch (error) {
+      lastError = error;
+
+      if (!isBrowserRateLimit(error)) throw error;
+
+      if (isDailyBrowserLimit(error)) {
+        throw new Error(
+          "Cloudflare Browser Run ücretsiz günlük 10 dakika kotası doldu. Kota 00:00 UTC'de sıfırlanır."
+        );
+      }
+
+      if (attempt === 2) break;
+
+      const waitMs = retryAfterMs(error, 21_000 + attempt * 2_000);
+      console.log(
+        `[browser] 429 rate limit; ${Math.ceil(waitMs / 1000)} saniye bekleniyor`,
+        { attempt: attempt + 1 }
+      );
+      await sleep(waitMs);
+    }
+  }
+
+  throw new Error(
+    `Cloudflare Browser Run yeni browser açma limiti devam ediyor: ${lastError?.message || lastError}`
+  );
+}
+
+async function waitForCachedAuth(env, maxWaitMs = 55_000) {
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    const auth = await env.AUTH_KV.get(AUTH_KEY);
+    if (auth) return auth;
+    await sleep(1000);
+  }
+
+  return null;
+}
 
 function corsHeaders() {
   return {
@@ -57,7 +133,7 @@ async function bootstrapAuth(env) {
     ? env.METODBOX_TOKEN.slice(7).trim()
     : env.METODBOX_TOKEN.trim();
 
-  const browser = await puppeteer.launch(env.BROWSER);
+  const browser = await launchBrowserWithBackoff(env);
   let timer;
 
   try {
@@ -115,10 +191,38 @@ async function getAuth(env, force = false) {
 
   if (!refreshPromise) {
     refreshPromise = (async () => {
+      let ownsLock = false;
+
       try {
-        if (force) await env.AUTH_KV.delete(AUTH_KEY);
-        return await bootstrapAuth(env);
+        // Best-effort cross-isolate single-flight. Cline/LiteLLM can fire several
+        // requests at once; without this they all try to launch Chromium and the
+        // Workers Free "1 new browser every 20 seconds" limit returns 429.
+        const existingLock = await env.AUTH_KV.get(AUTH_LOCK_KEY);
+
+        if (existingLock) {
+          const cachedAfterWait = await waitForCachedAuth(env);
+          if (cachedAfterWait && !force) return cachedAfterWait;
+
+          // Even on force refresh, another isolate may have just replaced the
+          // authorization while we were waiting. Reuse the fresh value.
+          const maybeFresh = await env.AUTH_KV.get(AUTH_KEY);
+          if (maybeFresh) return maybeFresh;
+        }
+
+        await env.AUTH_KV.put(AUTH_LOCK_KEY, String(Date.now()), {
+          expirationTtl: AUTH_LOCK_TTL_SECONDS,
+        });
+        ownsLock = true;
+
+        // Do not delete the old authorization before a new one is available.
+        // If Browser Run is temporarily rate-limited, keeping the old value is
+        // safer and avoids forcing every concurrent request into bootstrap.
+        const fresh = await bootstrapAuth(env);
+        return fresh;
       } finally {
+        if (ownsLock) {
+          await env.AUTH_KV.delete(AUTH_LOCK_KEY).catch(() => {});
+        }
         refreshPromise = null;
       }
     })();
