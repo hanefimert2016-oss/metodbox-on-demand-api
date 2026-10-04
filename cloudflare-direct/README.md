@@ -28,8 +28,7 @@ Mevcut Cloudflare hesabında:
 
 ```bash
 cd cloudflare-direct
-chmod +x setup.sh
-./setup.sh
+bash setup.sh
 ```
 
 Script:
