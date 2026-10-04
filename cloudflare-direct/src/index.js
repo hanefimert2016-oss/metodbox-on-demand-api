@@ -147,6 +147,304 @@ async function callGptPlus(env, body, forceRefresh = false) {
   return upstream;
 }
 
+
+function responseContentToText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return content == null ? "" : JSON.stringify(content);
+
+  return content
+    .map((part) => {
+      if (typeof part === "string") return part;
+      if (!part || typeof part !== "object") return "";
+      if (typeof part.text === "string") return part.text;
+      if (typeof part.content === "string") return part.content;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function responsesInputToMessages(body) {
+  const messages = [];
+
+  if (typeof body.instructions === "string" && body.instructions.trim()) {
+    messages.push({ role: "system", content: body.instructions });
+  }
+
+  const input = body.input;
+
+  if (typeof input === "string") {
+    messages.push({ role: "user", content: input });
+    return messages;
+  }
+
+  if (!Array.isArray(input)) return messages;
+
+  for (const item of input) {
+    if (typeof item === "string") {
+      messages.push({ role: "user", content: item });
+      continue;
+    }
+    if (!item || typeof item !== "object") continue;
+
+    if (item.type === "function_call_output") {
+      messages.push({
+        role: "tool",
+        tool_call_id: item.call_id || item.id || "",
+        content:
+          typeof item.output === "string"
+            ? item.output
+            : JSON.stringify(item.output ?? ""),
+      });
+      continue;
+    }
+
+    if (item.type === "function_call") {
+      const callId = item.call_id || item.id || `call_${crypto.randomUUID()}`;
+      messages.push({
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: callId,
+            type: "function",
+            function: {
+              name: item.name || "",
+              arguments:
+                typeof item.arguments === "string"
+                  ? item.arguments
+                  : JSON.stringify(item.arguments ?? {}),
+            },
+          },
+        ],
+      });
+      continue;
+    }
+
+    const role = item.role || (item.type === "message" ? "user" : null);
+    if (!role) continue;
+
+    messages.push({
+      role,
+      content: responseContentToText(item.content),
+    });
+  }
+
+  return messages;
+}
+
+function responsesToolsToChatTools(tools) {
+  if (!Array.isArray(tools)) return undefined;
+
+  const mapped = tools
+    .map((tool) => {
+      if (!tool || typeof tool !== "object") return null;
+
+      if (tool.type === "function" && tool.function) {
+        return tool;
+      }
+
+      if (tool.type === "function" && tool.name) {
+        return {
+          type: "function",
+          function: {
+            name: tool.name,
+            description: tool.description || "",
+            parameters: tool.parameters || { type: "object", properties: {} },
+            ...(tool.strict !== undefined ? { strict: tool.strict } : {}),
+          },
+        };
+      }
+
+      return null;
+    })
+    .filter(Boolean);
+
+  return mapped.length ? mapped : undefined;
+}
+
+function responsesToolChoiceToChat(choice) {
+  if (choice == null) return undefined;
+  if (typeof choice === "string") return choice;
+
+  if (
+    typeof choice === "object" &&
+    choice.type === "function" &&
+    typeof choice.name === "string"
+  ) {
+    return {
+      type: "function",
+      function: { name: choice.name },
+    };
+  }
+
+  return choice;
+}
+
+function chatCompletionToResponse(chat, requestBody, model) {
+  const choice = chat?.choices?.[0] || {};
+  const message = choice.message || {};
+  const output = [];
+
+  const text = responseContentToText(message.content);
+  if (text) {
+    output.push({
+      id: `msg_${crypto.randomUUID()}`,
+      type: "message",
+      status: "completed",
+      role: "assistant",
+      content: [
+        {
+          type: "output_text",
+          text,
+          annotations: [],
+        },
+      ],
+    });
+  }
+
+  if (Array.isArray(message.tool_calls)) {
+    for (const call of message.tool_calls) {
+      if (call?.type !== "function") continue;
+      output.push({
+        id: `fc_${crypto.randomUUID()}`,
+        type: "function_call",
+        status: "completed",
+        call_id: call.id || `call_${crypto.randomUUID()}`,
+        name: call.function?.name || "",
+        arguments:
+          typeof call.function?.arguments === "string"
+            ? call.function.arguments
+            : JSON.stringify(call.function?.arguments ?? {}),
+      });
+    }
+  }
+
+  const usage = chat?.usage
+    ? {
+        input_tokens:
+          chat.usage.prompt_tokens ?? chat.usage.input_tokens ?? 0,
+        output_tokens:
+          chat.usage.completion_tokens ?? chat.usage.output_tokens ?? 0,
+        total_tokens: chat.usage.total_tokens ?? 0,
+      }
+    : null;
+
+  return {
+    id: `resp_${crypto.randomUUID()}`,
+    object: "response",
+    created_at: Math.floor(Date.now() / 1000),
+    status: "completed",
+    error: null,
+    incomplete_details: null,
+    instructions: requestBody.instructions ?? null,
+    max_output_tokens:
+      requestBody.max_output_tokens ?? requestBody.max_completion_tokens ?? null,
+    model,
+    output,
+    parallel_tool_calls: requestBody.parallel_tool_calls ?? true,
+    previous_response_id: requestBody.previous_response_id ?? null,
+    reasoning: requestBody.reasoning ?? null,
+    store: requestBody.store ?? false,
+    temperature: requestBody.temperature ?? null,
+    text: requestBody.text ?? { format: { type: "text" } },
+    tool_choice: requestBody.tool_choice ?? "auto",
+    tools: requestBody.tools ?? [],
+    top_p: requestBody.top_p ?? null,
+    truncation: requestBody.truncation ?? "disabled",
+    usage,
+  };
+}
+
+function responsesSse(responseObject) {
+  const enc = new TextEncoder();
+
+  const inProgress = {
+    ...responseObject,
+    status: "in_progress",
+    output: [],
+  };
+
+  const events = [
+    {
+      type: "response.created",
+      response: inProgress,
+    },
+  ];
+
+  for (let outputIndex = 0; outputIndex < responseObject.output.length; outputIndex++) {
+    const item = responseObject.output[outputIndex];
+
+    events.push({
+      type: "response.output_item.added",
+      output_index: outputIndex,
+      item:
+        item.type === "message"
+          ? { ...item, status: "in_progress", content: [] }
+          : { ...item, status: "in_progress" },
+    });
+
+    if (item.type === "message") {
+      const content = item.content?.[0];
+      if (content?.type === "output_text") {
+        events.push({
+          type: "response.content_part.added",
+          item_id: item.id,
+          output_index: outputIndex,
+          content_index: 0,
+          part: { type: "output_text", text: "", annotations: [] },
+        });
+        events.push({
+          type: "response.output_text.delta",
+          item_id: item.id,
+          output_index: outputIndex,
+          content_index: 0,
+          delta: content.text,
+        });
+        events.push({
+          type: "response.output_text.done",
+          item_id: item.id,
+          output_index: outputIndex,
+          content_index: 0,
+          text: content.text,
+        });
+        events.push({
+          type: "response.content_part.done",
+          item_id: item.id,
+          output_index: outputIndex,
+          content_index: 0,
+          part: content,
+        });
+      }
+    }
+
+    events.push({
+      type: "response.output_item.done",
+      output_index: outputIndex,
+      item,
+    });
+  }
+
+  events.push({
+    type: "response.completed",
+    response: responseObject,
+  });
+
+  const body = events
+    .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+    .join("");
+
+  return new Response(enc.encode(body), {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-store",
+      Connection: "keep-alive",
+      ...corsHeaders(),
+    },
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -270,6 +568,139 @@ export default {
           status: upstream.status,
           headers,
         });
+      } catch (error) {
+        return json(
+          {
+            error: {
+              message: error?.message || String(error),
+              type: "metodbox_gateway_error",
+            },
+          },
+          502
+        );
+      }
+    }
+
+
+    if (
+      request.method === "POST" &&
+      (url.pathname === "/responses" ||
+        url.pathname === "/v1/responses" ||
+        url.pathname.endsWith("/responses"))
+    ) {
+      if (!validApiKey(request, env)) {
+        return json(
+          {
+            error: {
+              message: "Geçersiz API key",
+              type: "authentication_error",
+            },
+          },
+          401
+        );
+      }
+
+      let body;
+      try {
+        body = await request.json();
+      } catch (_) {
+        return json(
+          { error: { message: "Geçersiz JSON", type: "invalid_request_error" } },
+          400
+        );
+      }
+
+      const model = normalizeModel(body.model);
+      if (!model) {
+        return json(
+          {
+            error: {
+              message: `Desteklenmeyen model: ${String(body.model || "")}`,
+              type: "invalid_request_error",
+            },
+          },
+          400
+        );
+      }
+
+      const messages = responsesInputToMessages(body);
+      if (!messages.length) {
+        return json(
+          {
+            error: {
+              message: "Responses API input boş veya desteklenmeyen biçimde",
+              type: "invalid_request_error",
+            },
+          },
+          400
+        );
+      }
+
+      const chatBody = {
+        model,
+        messages,
+        stream: false,
+      };
+
+      const tools = responsesToolsToChatTools(body.tools);
+      if (tools) chatBody.tools = tools;
+
+      const toolChoice = responsesToolChoiceToChat(body.tool_choice);
+      if (toolChoice !== undefined) chatBody.tool_choice = toolChoice;
+
+      for (const key of [
+        "temperature",
+        "top_p",
+        "seed",
+        "frequency_penalty",
+        "presence_penalty",
+        "parallel_tool_calls",
+      ]) {
+        if (body[key] !== undefined) chatBody[key] = body[key];
+      }
+
+      if (body.max_output_tokens !== undefined) {
+        chatBody.max_tokens = body.max_output_tokens;
+      }
+
+      try {
+        const upstream = await callGptPlus(env, chatBody);
+
+        if (!upstream.ok) {
+          const text = await upstream.text();
+          return json(
+            {
+              error: {
+                message: `GPT+ API HTTP ${upstream.status}: ${text.slice(0, 1200)}`,
+                type: "metodbox_gateway_error",
+              },
+            },
+            502
+          );
+        }
+
+        const contentType = upstream.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const text = await upstream.text();
+          return json(
+            {
+              error: {
+                message: `GPT+ Responses bridge JSON bekliyordu, gelen Content-Type: ${contentType}; body: ${text.slice(0, 800)}`,
+                type: "metodbox_gateway_error",
+              },
+            },
+            502
+          );
+        }
+
+        const chat = await upstream.json();
+        const responseObject = chatCompletionToResponse(chat, body, model);
+
+        if (body.stream === true) {
+          return responsesSse(responseObject);
+        }
+
+        return json(responseObject);
       } catch (error) {
         return json(
           {
