@@ -1,0 +1,12 @@
+name = "metodbox-direct-api"
+main = "src/index.js"
+compatibility_date = "2026-10-04"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[browser]
+binding = "BROWSER"
+
+[[kv_namespaces]]
+binding = "AUTH_KV"
+id = "3e17fc451bea47958bc5d9456964d95b"
