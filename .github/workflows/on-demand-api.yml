@@ -38,7 +38,8 @@ jobs:
     timeout-minutes: 15
 
     env:
-      QUESTION: ${{ github.event.client_payload.question || inputs.question }}
+      QUESTION: ${{ inputs.question || '' }}
+      MESSAGES_B64: ${{ github.event.client_payload.messages_b64 || '' }}
       REQUEST_ID: ${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
       MODEL: ${{ github.event.client_payload.model || inputs.model || 'gpt-5.1' }}
       REQUEST_TS: ${{ github.event.client_payload.ts || '' }}
@@ -60,7 +61,7 @@ jobs:
 
       - name: Install Playwright
         run: |
-          python -m pip install --disable-pip-version-check playwright
+          python -m pip install --disable-pip-version-check playwright httpx
           python -m playwright install --with-deps chromium
 
       - name: Process one question
