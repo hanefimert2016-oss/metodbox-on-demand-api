@@ -16,6 +16,11 @@ on:
         description: "Unique client request id"
         required: true
         type: string
+      model:
+        description: "GPT+ model"
+        required: false
+        default: "gpt-5.1"
+        type: string
 
 concurrency:
   group: metodbox-on-demand-api-single-request
@@ -32,6 +37,7 @@ jobs:
     env:
       QUESTION: ${{ github.event.client_payload.question || inputs.question }}
       REQUEST_ID: ${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
+      MODEL: ${{ github.event.client_payload.model || inputs.model || 'gpt-5.1' }}
       REQUEST_TS: ${{ github.event.client_payload.ts || '' }}
       REQUEST_SIG: ${{ github.event.client_payload.sig || '' }}
 
@@ -75,7 +81,7 @@ jobs:
                   {
                       "status": "error",
                       "request_id": os.environ.get("REQUEST_ID", ""),
-                      "model": "gpt-5.1",
+                      "model": os.environ.get("MODEL", "gpt-5.1"),
                       "answer": "",
                       "error": "Worker exited before response.json was created",
                   },
