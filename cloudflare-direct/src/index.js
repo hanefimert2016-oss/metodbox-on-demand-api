@@ -168,6 +168,108 @@ function normalizeToolHistory(messages) {
   return out;
 }
 
+function sanitizeChatToolCalls(chat, requestBody) {
+  if (!chat || !Array.isArray(chat.choices)) return chat;
+
+  for (const choice of chat.choices) {
+    const calls = choice?.message?.tool_calls;
+    if (!Array.isArray(calls)) continue;
+
+    for (const call of calls) {
+      if (call?.type !== "function" || !call.function) continue;
+      call.function.arguments = sanitizeToolArguments(
+        call.function.name || "",
+        call.function.arguments,
+        requestBody
+      );
+    }
+  }
+
+  return chat;
+}
+
+function chatCompletionToSse(chat) {
+  const id = chat?.id || "chatcmpl_" + crypto.randomUUID();
+  const model = chat?.model || DEFAULT_MODEL;
+  const created = chat?.created || Math.floor(Date.now() / 1000);
+  const events = [];
+
+  for (const choice of chat?.choices || []) {
+    const index = choice.index ?? 0;
+    const message = choice.message || {};
+
+    events.push({
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [{ index, delta: { role: "assistant" }, finish_reason: null }],
+    });
+
+    if (typeof message.content === "string" && message.content.length) {
+      events.push({
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{ index, delta: { content: message.content }, finish_reason: null }],
+      });
+    }
+
+    if (Array.isArray(message.tool_calls)) {
+      for (let i = 0; i < message.tool_calls.length; i++) {
+        const call = message.tool_calls[i];
+        events.push({
+          id,
+          object: "chat.completion.chunk",
+          created,
+          model,
+          choices: [{
+            index,
+            delta: {
+              tool_calls: [{
+                index: i,
+                id: call.id,
+                type: call.type || "function",
+                function: {
+                  name: call.function?.name || "",
+                  arguments: call.function?.arguments || "{}",
+                },
+              }],
+            },
+            finish_reason: null,
+          }],
+        });
+      }
+    }
+
+    events.push({
+      id,
+      object: "chat.completion.chunk",
+      created,
+      model,
+      choices: [{
+        index,
+        delta: {},
+        finish_reason: choice.finish_reason || (message.tool_calls?.length ? "tool_calls" : "stop"),
+      }],
+    });
+  }
+
+  const body =
+    events.map((x) => "data: " + JSON.stringify(x) + "\n\n").join("") +
+    "data: [DONE]\n\n";
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-store",
+      ...corsHeaders(),
+    },
+  });
+}
+
 function sanitizeToolFields(body) {
   const out = { ...body };
   const hasTools = Array.isArray(out.tools) && out.tools.length > 0;
@@ -853,7 +955,12 @@ export default {
       body = sanitizeToolFields(body);
 
       try {
-        const upstream = await callGptPlus(env, body);
+        const hasTools = Array.isArray(body.tools) && body.tools.length > 0;
+        const clientWantedStream = body.stream === true;
+        const upstreamBody =
+          hasTools && clientWantedStream ? { ...body, stream: false } : body;
+
+        const upstream = await callGptPlus(env, upstreamBody);
 
         if (!upstream.ok) {
           const text = await upstream.text();
@@ -866,6 +973,15 @@ export default {
             },
             502
           );
+        }
+
+        if (hasTools) {
+          const contentType = upstream.headers.get("content-type") || "";
+          if (contentType.includes("application/json")) {
+            const chat = sanitizeChatToolCalls(await upstream.json(), body);
+            if (clientWantedStream) return chatCompletionToSse(chat);
+            return json(chat);
+          }
         }
 
         const headers = new Headers(upstream.headers);
