@@ -17,19 +17,60 @@ fi
 npm install
 
 if [[ ! -f wrangler.toml ]]; then
-  echo "Cloudflare KV namespace oluşturuluyor..."
-  OUT="$(npx wrangler kv namespace create AUTH_KV 2>&1 | tee /dev/stderr)"
-  KV_ID="$(printf '%s\n' "$OUT" | sed -n 's/.*id = "\([^"]*\)".*/\1/p' | tail -n1)"
+  echo "Cloudflare KV namespace aranıyor..."
+
+  # Önce mevcut AUTH_KV namespace'i yeniden kullan. Böylece script yarıda
+  # kesildikten sonra tekrar çalıştırıldığında ikinci bir namespace oluşturmaz.
+  LIST_OUT="$(npx wrangler kv namespace list 2>/dev/null || true)"
+  KV_ID="$(
+    printf '%s\n' "$LIST_OUT" | python3 -c '
+import json, sys
+text = sys.stdin.read().strip()
+try:
+    data = json.loads(text)
+except Exception:
+    data = []
+for item in data:
+    if item.get("title") == "AUTH_KV":
+        print(item.get("id", ""))
+        break
+'
+  )"
+
+  if [[ -n "$KV_ID" ]]; then
+    echo "Mevcut AUTH_KV bulundu: $KV_ID"
+  else
+    echo "AUTH_KV bulunamadı; oluşturuluyor..."
+    OUT="$(npx wrangler kv namespace create AUTH_KV 2>&1 | tee /dev/stderr)"
+
+    # Wrangler v4 JSON snippet çıktısını ve eski TOML snippet çıktısını destekle.
+    KV_ID="$(
+      printf '%s\n' "$OUT" | python3 -c '
+import re, sys
+text = sys.stdin.read()
+patterns = [
+    r"\"id\"\s*:\s*\"([0-9a-fA-F]+)\"",
+    r"id\s*=\s*\"([0-9a-fA-F]+)\"",
+]
+for p in patterns:
+    m = re.search(p, text)
+    if m:
+        print(m.group(1))
+        break
+'
+    )"
+  fi
 
   if [[ -z "$KV_ID" ]]; then
     echo
     echo "KV ID otomatik alınamadı."
-    echo "Şunu çalıştırıp çıkan id'yi wrangler.template.toml içine koy:"
-    echo "  npx wrangler kv namespace create AUTH_KV"
+    echo "Kontrol için:"
+    echo "  npx wrangler kv namespace list"
     exit 1
   fi
 
-  sed "s/REPLACE_WITH_KV_NAMESPACE_ID/$KV_ID/"     wrangler.template.toml > wrangler.toml
+  sed "s/REPLACE_WITH_KV_NAMESPACE_ID/$KV_ID/" \
+    wrangler.template.toml > wrangler.toml
 fi
 
 echo "API_KEY secret yükleniyor..."
