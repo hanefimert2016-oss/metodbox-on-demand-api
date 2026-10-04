@@ -19,23 +19,45 @@ export default {
 
       const url = new URL(request.url);
 
-      if (request.method === "GET" && url.pathname === "/health") {
-        return json({ ok: true, service: "metodbox-on-demand-api" });
+      if (
+        request.method === "GET" &&
+        (url.pathname === "/health" || url.pathname === "/" || url.pathname === "/v1")
+      ) {
+        return json({
+          ok: true,
+          service: "metodbox-on-demand-api",
+          model: MODEL,
+          openai_compatible: true,
+        });
       }
 
-      if (request.method === "GET" && url.pathname === "/v1/models") {
-        requireApiKey(request, env);
+      const path = url.pathname.replace(/\/+$/, "") || "/";
+
+      if (
+        request.method === "GET" &&
+        (path === "/models" || path === "/v1/models")
+      ) {
+        // Model discovery is intentionally public; no secret is exposed here.
+        // Some OpenAI-compatible clients probe /models even when the configured
+        // base URL already ends with /v1.
         return json({
           object: "list",
           data: [{
             id: MODEL,
             object: "model",
+            created: 0,
             owned_by: "metodbox",
+            permission: [],
+            root: MODEL,
+            parent: null,
           }],
         });
       }
 
-      if (request.method !== "POST" || url.pathname !== "/v1/chat/completions") {
+      if (
+        request.method !== "POST" ||
+        (path !== "/chat/completions" && path !== "/v1/chat/completions")
+      ) {
         return json({ error: { message: "Not found" } }, 404);
       }
 
