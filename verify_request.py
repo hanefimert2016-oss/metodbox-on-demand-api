@@ -13,6 +13,7 @@ if EVENT_NAME != "repository_dispatch":
 api_key = os.environ.get("API_KEY", "")
 question = os.environ.get("QUESTION", "")
 request_id = os.environ.get("REQUEST_ID", "")
+model = os.environ.get("MODEL", "gpt-5.1")
 timestamp = os.environ.get("REQUEST_TS", "")
 signature = os.environ.get("REQUEST_SIG", "").lower().strip()
 
@@ -35,7 +36,7 @@ if abs(int(time.time()) - ts) > 300:
     print("Request timestamp is outside the 5 minute window.", file=sys.stderr)
     raise SystemExit(5)
 
-message = f"{timestamp}\n{request_id}\n{question}".encode("utf-8")
+message = f"{timestamp}\n{request_id}\n{model}\n{question}".encode("utf-8")
 expected = hmac.new(api_key.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 if not hmac.compare_digest(expected, signature):
