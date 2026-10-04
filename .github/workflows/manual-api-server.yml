@@ -1,0 +1,164 @@
+name: Manual API Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      lifetime_minutes:
+        description: "API açık kalma süresi (dakika, en fazla 350)"
+        required: false
+        default: "120"
+        type: string
+
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: manual-api-server
+  cancel-in-progress: true
+
+jobs:
+  serve:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.issue.title, '[START API]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+      METODBOX_TOKEN: ${{ secrets.METODBOX_TOKEN }}
+      CONTROL_ISSUE: ${{ github.event.issue.number || '' }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --disable-pip-version-check -r github-runtime/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Start API server
+        run: |
+          nohup python -m uvicorn server:app             --app-dir github-runtime             --host 127.0.0.1             --port 8787             > /tmp/metodbox-api.log 2>&1 &
+          echo $! > /tmp/metodbox-api.pid
+
+          for i in $(seq 1 120); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then
+              echo "API server ready."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API server failed to start."
+          cat /tmp/metodbox-api.log || true
+          exit 1
+
+      - name: Open temporary HTTPS tunnel
+        id: tunnel
+        run: |
+          : > /tmp/tunnel.log
+          nohup ssh             -o StrictHostKeyChecking=no             -o UserKnownHostsFile=/dev/null             -o ServerAliveInterval=30             -o ServerAliveCountMax=3             -o ExitOnForwardFailure=yes             -R 80:127.0.0.1:8787             nokey@localhost.run             > /tmp/tunnel.log 2>&1 &
+          echo $! > /tmp/tunnel.pid
+
+          URL=""
+          for i in $(seq 1 90); do
+            URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.localhost\.run' /tmp/tunnel.log | tail -n1 || true)"
+            if [ -n "$URL" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          if [ -z "$URL" ]; then
+            echo "Tunnel URL alınamadı."
+            cat /tmp/tunnel.log || true
+            exit 1
+          fi
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "PUBLIC_URL=$URL" >> "$GITHUB_ENV"
+
+          {
+            echo "## Metodbox API açık"
+            echo
+            echo "**Base URL:** `$URL/v1`"
+            echo
+            echo "**Models:** `gpt-5.1`, `gpt-oss:120b`"
+            echo
+            echo "Bu workflow durunca URL de kapanır."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$CONTROL_ISSUE" ]; then
+            gh issue comment "$CONTROL_ISSUE"               --repo "${{ github.repository }}"               --body "API hazır. Base URL: `$URL/v1` — Modeller: `gpt-5.1`, `gpt-oss:120b`. Bu issue kapatılınca sunucu kapanacak."
+          fi
+
+          echo "API URL: $URL/v1"
+
+      - name: Keep server alive
+        run: |
+          if [ -n "$CONTROL_ISSUE" ]; then
+            echo "Issue #$CONTROL_ISSUE açık olduğu sürece API çalışacak."
+            while true; do
+              STATE="$(gh api "/repos/${{ github.repository }}/issues/$CONTROL_ISSUE" --jq .state)"
+              if [ "$STATE" != "open" ]; then
+                echo "Control issue kapandı; API durduruluyor."
+                break
+              fi
+
+              if ! kill -0 "$(cat /tmp/metodbox-api.pid)" 2>/dev/null; then
+                echo "API process durdu."
+                cat /tmp/metodbox-api.log || true
+                exit 1
+              fi
+
+              if ! kill -0 "$(cat /tmp/tunnel.pid)" 2>/dev/null; then
+                echo "Tunnel process durdu."
+                cat /tmp/tunnel.log || true
+                exit 1
+              fi
+
+              sleep 10
+            done
+          else
+            MINUTES="${{ inputs.lifetime_minutes }}"
+            case "$MINUTES" in
+              ''|*[!0-9]*) MINUTES=120 ;;
+            esac
+            if [ "$MINUTES" -lt 1 ]; then MINUTES=1; fi
+            if [ "$MINUTES" -gt 350 ]; then MINUTES=350; fi
+
+            echo "API $MINUTES dakika açık kalacak."
+            for i in $(seq 1 $((MINUTES * 6))); do
+              if ! kill -0 "$(cat /tmp/metodbox-api.pid)" 2>/dev/null; then
+                cat /tmp/metodbox-api.log || true
+                exit 1
+              fi
+              if ! kill -0 "$(cat /tmp/tunnel.pid)" 2>/dev/null; then
+                cat /tmp/tunnel.log || true
+                exit 1
+              fi
+              sleep 10
+            done
+          fi
+
+      - name: Stop notice
+        if: always()
+        run: |
+          [ -f /tmp/tunnel.pid ] && kill "$(cat /tmp/tunnel.pid)" 2>/dev/null || true
+          [ -f /tmp/metodbox-api.pid ] && kill "$(cat /tmp/metodbox-api.pid)" 2>/dev/null || true
+
+          if [ -n "$CONTROL_ISSUE" ]; then
+            gh issue comment "$CONTROL_ISSUE"               --repo "${{ github.repository }}"               --body "API kapandı." || true
+          fi
