@@ -790,6 +790,19 @@ export default {
         chatBody.max_tokens = body.max_output_tokens;
       }
 
+      // Responses API / LiteLLM may express reasoning as either
+      // reasoning: { effort: "high" } or reasoning_effort: "high".
+      // Metodbox GPT-5.1 expects the Chat Completions field reasoning_effort.
+      const reasoningEffort =
+        body.reasoning_effort ??
+        (body.reasoning && typeof body.reasoning === "object"
+          ? body.reasoning.effort
+          : undefined);
+
+      if (reasoningEffort !== undefined) {
+        chatBody.reasoning_effort = reasoningEffort;
+      }
+
       try {
         const upstream = await callGptPlus(env, chatBody);
 
