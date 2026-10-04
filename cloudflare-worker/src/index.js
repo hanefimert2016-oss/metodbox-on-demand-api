@@ -66,9 +66,8 @@ export default {
       requireApiKey(request, env);
 
       const body = await request.json();
-      const question = extractUserMessage(body);
-      if (!question) {
-        return json({ error: { message: "messages içinde kullanıcı mesajı bulunamadı" } }, 400);
+      if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+        return json({ error: { message: "messages boş olamaz" } }, 400);
       }
 
       const requestedModel = normalizeModel(body.model);
@@ -80,11 +79,25 @@ export default {
         }, 400);
       }
 
+      // Preserve the whole OpenAI conversation, not only the last user line.
+      // This matters for Cline task-resumption/system context.
+      const messagesJson = JSON.stringify(body.messages);
+      const messagesB64 = base64Bytes(new TextEncoder().encode(messagesJson));
+
+      // repository_dispatch has a payload size limit. Keep headroom for metadata.
+      if (messagesB64.length > 56000) {
+        return json({
+          error: {
+            message: "İstek bağlamı GitHub dispatch için çok büyük; daha kısa context gerekli."
+          }
+        }, 413);
+      }
+
       const requestId = crypto.randomUUID();
       const ts = Math.floor(Date.now() / 1000).toString();
       const sig = await hmacSha256Hex(
         env.API_KEY,
-        `${ts}\n${requestId}\n${requestedModel}\n${question}`
+        `${ts}\n${requestId}\n${requestedModel}\n${messagesB64}`
       );
 
       const installationToken = await getInstallationToken(env);
@@ -97,7 +110,7 @@ export default {
           body: JSON.stringify({
             event_type: "metodbox_question",
             client_payload: {
-              question,
+              messages_b64: messagesB64,
               model: requestedModel,
               request_id: requestId,
               ts,
@@ -347,6 +360,12 @@ async function makeGitHubAppJwt(appId, privateKeyPem) {
   );
 
   return `${unsigned}.${base64UrlBytes(new Uint8Array(signature))}`;
+}
+
+function base64Bytes(bytes) {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
 }
 
 function base64UrlJson(value) {
