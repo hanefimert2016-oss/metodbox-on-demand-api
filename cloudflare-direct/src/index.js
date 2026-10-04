@@ -873,7 +873,7 @@ export default {
         service: "metodbox-direct-worker",
         models: MODELS,
         mode: "cloudflare-browser-run",
-        build: "openhands-tool-history-fix-v2",
+        build: "openhands-tool-history-fix-v3",
       });
     }
 
