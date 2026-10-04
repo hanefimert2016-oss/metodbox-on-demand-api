@@ -411,23 +411,45 @@ async function callGptPlus(env, body, forceRefresh = false) {
   // Never send tool_choice/parallel_tool_calls unless actual tools exist.
   body = sanitizeToolFields(body);
 
-  const auth = await getAuth(env, forceRefresh);
+  let auth = await getAuth(env, forceRefresh);
+  let refreshedAuth = forceRefresh;
+  const transientStatuses = new Set([502, 503, 504]);
+  const retryDelaysMs = [1200, 3500];
 
-  const upstream = await fetch(`${GPTPLUS}/api/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: auth,
-      "Content-Type": "application/json",
-      Accept: "application/json, text/event-stream",
-    },
-    body: JSON.stringify(body),
-  });
+  for (let attempt = 0; ; attempt++) {
+    const upstream = await fetch(`${GPTPLUS}/api/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+        Accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify(body),
+    });
 
-  if ((upstream.status === 401 || upstream.status === 403) && !forceRefresh) {
-    return await callGptPlus(env, body, true);
+    if (
+      (upstream.status === 401 || upstream.status === 403) &&
+      !refreshedAuth
+    ) {
+      auth = await getAuth(env, true);
+      refreshedAuth = true;
+      continue;
+    }
+
+    if (
+      transientStatuses.has(upstream.status) &&
+      attempt < retryDelaysMs.length
+    ) {
+      const waitMs = retryDelaysMs[attempt];
+      console.log(
+        `[gptplus] transient HTTP ${upstream.status}; retry ${attempt + 1}/${retryDelaysMs.length} in ${waitMs}ms`
+      );
+      await sleep(waitMs);
+      continue;
+    }
+
+    return upstream;
   }
-
-  return upstream;
 }
 
 
@@ -890,7 +912,7 @@ export default {
         service: "metodbox-direct-worker",
         models: MODELS,
         mode: "cloudflare-browser-run",
-        build: "openhands-tool-history-fix-v4",
+        build: "openhands-tool-history-fix-v5-retry504",
       });
     }
 
