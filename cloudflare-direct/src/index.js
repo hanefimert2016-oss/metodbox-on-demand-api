@@ -108,10 +108,13 @@ function normalizeModel(value) {
     "gpt-5.1": "gpt-5.1",
     "gpt5.1": "gpt-5.1",
     "openai/gpt-5.1": "gpt-5.1",
+    "custom_openai/gpt-5.1": "gpt-5.1",
     "gpt-oss:120b": "gpt-oss:120b",
     "gpt-oss-120b": "gpt-oss:120b",
     "openai/gpt-oss:120b": "gpt-oss:120b",
     "openai/gpt-oss-120b": "gpt-oss:120b",
+    "custom_openai/gpt-oss:120b": "gpt-oss:120b",
+    "custom_openai/gpt-oss-120b": "gpt-oss:120b",
   };
   const model = aliases[raw.toLowerCase()] || aliases[raw];
   return MODELS.includes(model) ? model : null;
