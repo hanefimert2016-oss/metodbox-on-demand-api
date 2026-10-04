@@ -245,6 +245,10 @@ async function getAuth(env, force = false) {
 }
 
 async function callGptPlus(env, body, forceRefresh = false) {
+  // Final guard for every route: never send tool_choice/parallel_tool_calls
+  // unless at least one actual tool is present.
+  body = sanitizeToolFields(body);
+
   const auth = await getAuth(env, forceRefresh);
 
   const upstream = await fetch(`${GPTPLUS}/api/chat/completions`, {
