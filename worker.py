@@ -209,14 +209,18 @@ async def run():
             )
             page = await context.new_page()
 
+            print(f"[worker] opening GPT+ for model={MODEL}", flush=True)
             await page.goto(
                 f"{BASE}/?token={quote(token, safe='')}",
                 wait_until="domcontentloaded",
                 timeout=90000,
             )
 
+            print("[worker] locating chat input", flush=True)
             chat = await find_chat_input(page)
+            print(f"[worker] selecting model={MODEL}", flush=True)
             await select_model(page, MODEL)
+            print("[worker] model ready; sending question", flush=True)
             messages = page.locator('[id^="message-"]')
             before = await messages.count()
 
@@ -224,7 +228,9 @@ async def run():
             await chat.fill(QUESTION)
             await chat.press("Enter")
 
+            print("[worker] waiting for assistant response", flush=True)
             answer = await wait_for_answer(page, before)
+            print("[worker] assistant response received", flush=True)
 
             await context.close()
             await browser.close()
