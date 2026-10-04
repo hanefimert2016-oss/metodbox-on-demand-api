@@ -1,0 +1,170 @@
+name: Probe Metodbox reasoning fields
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    if: startsWith(github.event.issue.title, '[TEST REASONING]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      METODBOX_TOKEN: ${{ secrets.METODBOX_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      ISSUE_NUMBER: ${{ github.event.issue.number }}
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --disable-pip-version-check httpx playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Probe reasoning/thinking payloads
+        run: |
+          cat > /tmp/probe.py <<'PY'
+          import asyncio, json, os
+          from urllib.parse import quote
+          import httpx
+          from playwright.async_api import async_playwright
+
+          BASE = "https://gptplus.metodbox.ai"
+          TOKEN = os.environ["METODBOX_TOKEN"].strip()
+          if TOKEN.lower().startswith("bearer "):
+              TOKEN = TOKEN[7:].strip()
+
+          CASES = [
+              ("baseline", {}),
+              ("reasoning_effort_high", {"reasoning_effort": "high"}),
+              ("reasoning_effort_invalid", {"reasoning_effort": "banana"}),
+              ("reasoning_object_high", {"reasoning": {"effort": "high"}}),
+              ("reasoning_object_invalid", {"reasoning": {"effort": "banana"}}),
+              ("thinking_enabled", {"thinking": {"type": "enabled", "budget_tokens": 256}}),
+              ("thinking_disabled", {"thinking": {"type": "disabled"}}),
+          ]
+
+          MODELS = ["gpt-5.1", "gpt-oss:120b"]
+
+          def summarize_response(resp):
+              out = {"status": resp.status_code}
+              try:
+                  data = resp.json()
+              except Exception:
+                  out["body"] = resp.text[:700]
+                  return out
+
+              if resp.status_code >= 400:
+                  out["error"] = data.get("error", data)
+                  return out
+
+              out["top_keys"] = sorted(data.keys()) if isinstance(data, dict) else []
+              choices = data.get("choices") if isinstance(data, dict) else None
+              if isinstance(choices, list) and choices:
+                  msg = choices[0].get("message") or {}
+                  out["message_keys"] = sorted(msg.keys()) if isinstance(msg, dict) else []
+                  if isinstance(msg, dict):
+                      for key in ["reasoning", "reasoning_content", "thinking", "analysis"]:
+                          if key in msg:
+                              val = msg[key]
+                              out[f"message_{key}"] = str(val)[:500]
+                      content = msg.get("content")
+                      if isinstance(content, str):
+                          out["content"] = content[:300]
+              for key in ["reasoning", "reasoning_content", "thinking", "analysis"]:
+                  if isinstance(data, dict) and key in data:
+                      out[key] = str(data[key])[:500]
+              if isinstance(data, dict) and "usage" in data:
+                  out["usage"] = data["usage"]
+              return out
+
+          async def main():
+              auth_future = None
+              async with async_playwright() as pw:
+                  browser = await pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+                  page = await browser.new_page()
+
+                  loop = asyncio.get_running_loop()
+                  auth_future = loop.create_future()
+
+                  async def on_response(response):
+                      if "/api/models" in response.url and response.status == 200 and not auth_future.done():
+                          try:
+                              auth = response.request.headers.get("authorization")
+                              if auth:
+                                  auth_future.set_result(auth)
+                          except Exception:
+                              pass
+
+                  page.on("response", on_response)
+                  await page.goto(f"{BASE}/?token={quote(TOKEN, safe='')}", wait_until="domcontentloaded", timeout=90000)
+                  auth = await asyncio.wait_for(auth_future, timeout=90)
+                  await browser.close()
+
+              results = []
+              async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=30.0), follow_redirects=True) as client:
+                  for model in MODELS:
+                      for name, extra in CASES:
+                          payload = {
+                              "model": model,
+                              "messages": [{"role": "user", "content": "2+2? Sadece sayıyı yaz."}],
+                              "stream": False,
+                              **extra,
+                          }
+                          r = await client.post(
+                              f"{BASE}/api/chat/completions",
+                              headers={
+                                  "Authorization": auth,
+                                  "Content-Type": "application/json",
+                                  "Accept": "application/json",
+                              },
+                              json=payload,
+                          )
+                          row = {"model": model, "case": name, "sent": extra, **summarize_response(r)}
+                          results.append(row)
+                          print(json.dumps(row, ensure_ascii=False), flush=True)
+
+              with open("/tmp/reasoning-probe.json", "w", encoding="utf-8") as f:
+                  json.dump(results, f, ensure_ascii=False, indent=2)
+
+          asyncio.run(main())
+          PY
+
+          python /tmp/probe.py | tee /tmp/probe.log
+
+      - name: Comment compact result
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          try:
+              rows=json.load(open("/tmp/reasoning-probe.json", encoding="utf-8"))
+              lines=["Metodbox reasoning/thinking probe sonucu:"]
+              for r in rows:
+                  msg=f"- {r['model']} / {r['case']}: HTTP {r['status']}"
+                  if 'error' in r:
+                      err=r['error']
+                      if isinstance(err, dict):
+                          msg += " — " + str(err.get('message', err))[:180]
+                      else:
+                          msg += " — " + str(err)[:180]
+                  else:
+                      mk=",".join(r.get("message_keys", []))
+                      msg += f" — message_keys=[{mk}]"
+                  lines.append(msg)
+              body="\n".join(lines)
+          except Exception as e:
+              body=f"Probe sonucu okunamadı: {e}"
+          subprocess.run([
+              "gh","issue","comment",os.environ["ISSUE_NUMBER"],
+              "--repo",os.environ["GITHUB_REPOSITORY"],
+              "--body",body
+          ], check=False)
+          PY
