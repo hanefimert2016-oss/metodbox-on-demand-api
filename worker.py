@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 import asyncio
+import base64
 import json
 import os
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+import httpx
 from playwright.async_api import async_playwright
 
 BASE = "https://gptplus.metodbox.ai"
 MODEL = os.environ.get("MODEL", "gpt-5.1").strip() or "gpt-5.1"
 SUPPORTED_MODELS = {"gpt-5.1", "gpt-oss:120b"}
-QUESTION = os.environ.get("QUESTION", "").strip()
 REQUEST_ID = os.environ.get("REQUEST_ID", "").strip()
 TOKEN = os.environ.get("METODBOX_TOKEN", "").strip()
+MESSAGES_B64 = os.environ.get("MESSAGES_B64", "").strip()
+QUESTION = os.environ.get("QUESTION", "").strip()
 OUT = Path("api-response/response.json")
 
 
@@ -30,118 +32,154 @@ def save(payload):
     )
 
 
-async def find_chat_input(page):
-    selectors = [
-        "textarea#chat-input",
-        "textarea[placeholder]",
-        "textarea",
-        '[contenteditable="true"]',
-    ]
-    for selector in selectors:
-        locator = page.locator(selector).first
+def load_messages():
+    if MESSAGES_B64:
         try:
-            await locator.wait_for(state="visible", timeout=8000)
-            return locator
-        except Exception:
-            pass
-    raise RuntimeError("GPT+ chat input bulunamadı")
+            raw = base64.b64decode(MESSAGES_B64).decode("utf-8")
+            messages = json.loads(raw)
+            if not isinstance(messages, list) or not messages:
+                raise ValueError("messages must be a non-empty list")
+            return messages
+        except Exception as exc:
+            raise RuntimeError(f"Invalid MESSAGES_B64 payload: {exc}") from exc
 
-async def select_model(page, model):
-    if model not in SUPPORTED_MODELS:
-        raise RuntimeError(f"Unsupported model: {model}")
+    if QUESTION:
+        return [{"role": "user", "content": QUESTION}]
 
-    if model == "gpt-5.1":
-        return
+    raise RuntimeError("No conversation payload was supplied")
 
-    # GPT+ is Open WebUI-derived. Try common model-selector shapes.
-    openers = [
-        'button:has-text("gpt-5.1")',
-        '[role="button"]:has-text("gpt-5.1")',
-        'button[aria-label*="model" i]',
-        '[data-testid*="model" i]',
-    ]
 
-    opened = False
-    for selector in openers:
-        locator = page.locator(selector).first
-        try:
-            if await locator.is_visible(timeout=1500):
-                await locator.click()
-                opened = True
-                break
-        except Exception:
-            pass
+def extract_completion_text(data):
+    if not isinstance(data, dict):
+        raise RuntimeError("GPT+ returned a non-object response")
 
-    if not opened:
-        # Fall back to exact visible model text before any chat messages exist.
-        locator = page.get_by_text("gpt-5.1", exact=True).first
-        try:
-            await locator.wait_for(state="visible", timeout=5000)
-            await locator.click()
-            opened = True
-        except Exception:
-            pass
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        choice = choices[0] or {}
+        message = choice.get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content
 
-    if not opened:
-        raise RuntimeError("GPT+ model selector could not be opened")
+        # Some providers may return content as typed parts.
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text") or part.get("content")
+                    if isinstance(text, str):
+                        parts.append(text)
+            joined = "".join(parts).strip()
+            if joined:
+                return joined
 
-    options = [
-        f'[role="option"]:has-text("{model}")',
-        f'button:has-text("{model}")',
-        f'[role="menuitem"]:has-text("{model}")',
-    ]
+    # Useful fallback for provider-specific wrappers.
+    for key in ("response", "message", "content", "text"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
 
-    for selector in options:
-        locator = page.locator(selector).last
-        try:
-            await locator.wait_for(state="visible", timeout=4000)
-            await locator.click()
-            await page.wait_for_timeout(800)
+    raise RuntimeError(
+        "GPT+ completion response did not contain assistant text"
+    )
+
+
+async def capture_authorization(page, bootstrap_token):
+    loop = asyncio.get_running_loop()
+    auth_future = loop.create_future()
+
+    async def on_response(response):
+        if "/api/models" not in response.url or response.status != 200:
             return
+        try:
+            headers = response.request.headers
+            auth = headers.get("authorization")
+            if auth and not auth_future.done():
+                auth_future.set_result(auth)
         except Exception:
             pass
 
-    locator = page.get_by_text(model, exact=True).last
+    page.on("response", on_response)
+
+    print("[worker] bootstrapping GPT+ session", flush=True)
+    await page.goto(
+        f"{BASE}/?token={quote(bootstrap_token, safe='')}",
+        wait_until="domcontentloaded",
+        timeout=90000,
+    )
+
     try:
-        await locator.wait_for(state="visible", timeout=5000)
-        await locator.click()
-        await page.wait_for_timeout(800)
-        return
-    except Exception:
-        raise RuntimeError(f"GPT+ model option not found: {model}")
+        auth = await asyncio.wait_for(auth_future, timeout=90)
+        print("[worker] GPT+ session authorization captured", flush=True)
+        return auth
+    except asyncio.TimeoutError as exc:
+        raise RuntimeError("GPT+ session authorization capture timed out") from exc
 
 
-async def wait_for_answer(page, before_count, timeout_s=180):
-    messages = page.locator('[id^="message-"]')
-    deadline = time.time() + timeout_s
-    last = ""
-    stable = 0
+async def call_gptplus(auth_header, messages):
+    payload = {
+        "model": MODEL,
+        "messages": messages,
+        "stream": False,
+    }
 
-    while time.time() < deadline:
-        count = await messages.count()
+    print(f"[worker] calling GPT+ API model={MODEL}", flush=True)
 
-        if count > before_count:
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(180.0, connect=30.0),
+        follow_redirects=True,
+    ) as client:
+        response = await client.post(
+            f"{BASE}/api/chat/completions",
+            headers={
+                "Authorization": auth_header,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            json=payload,
+        )
+
+    if response.status_code >= 400:
+        body = response.text[:1000]
+        raise RuntimeError(
+            f"GPT+ API HTTP {response.status_code}: {body}"
+        )
+
+    content_type = response.headers.get("content-type", "")
+    if "text/event-stream" in content_type:
+        answer_parts = []
+        for line in response.text.splitlines():
+            line = line.strip()
+            if not line.startswith("data:"):
+                continue
+            value = line[5:].strip()
+            if not value or value == "[DONE]":
+                continue
             try:
-                text = (await messages.nth(count - 1).inner_text()).strip()
+                chunk = json.loads(value)
             except Exception:
-                text = ""
+                continue
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+            delta = (choices[0] or {}).get("delta") or {}
+            piece = delta.get("content")
+            if isinstance(piece, str):
+                answer_parts.append(piece)
 
-            if text:
-                if text == last:
-                    stable += 1
-                else:
-                    last = text
-                    stable = 0
+        answer = "".join(answer_parts).strip()
+        if not answer:
+            raise RuntimeError("GPT+ SSE response contained no assistant text")
+        return answer
 
-                if stable >= 3:
-                    return last
+    try:
+        data = response.json()
+    except Exception as exc:
+        raise RuntimeError(
+            f"GPT+ returned invalid JSON: {response.text[:1000]}"
+        ) from exc
 
-        await asyncio.sleep(1.5)
-
-    if last:
-        return last
-
-    raise RuntimeError("GPT+ response timed out")
+    return extract_completion_text(data)
 
 
 async def run():
@@ -171,18 +209,6 @@ async def run():
         })
         return 2
 
-    if not QUESTION:
-        save({
-            "status": "error",
-            "request_id": REQUEST_ID,
-            "model": MODEL,
-            "answer": "",
-            "error": "QUESTION is empty",
-            "started_at": started,
-            "finished_at": now(),
-        })
-        return 2
-
     if not TOKEN:
         save({
             "status": "error",
@@ -198,42 +224,25 @@ async def run():
     token = TOKEN[7:].strip() if TOKEN.lower().startswith("bearer ") else TOKEN
 
     try:
+        messages = load_messages()
+
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=True,
                 args=["--no-sandbox", "--disable-dev-shm-usage"],
             )
-
             context = await browser.new_context(
                 viewport={"width": 1440, "height": 1000}
             )
             page = await context.new_page()
 
-            print(f"[worker] opening GPT+ for model={MODEL}", flush=True)
-            await page.goto(
-                f"{BASE}/?token={quote(token, safe='')}",
-                wait_until="domcontentloaded",
-                timeout=90000,
-            )
-
-            print("[worker] locating chat input", flush=True)
-            chat = await find_chat_input(page)
-            print(f"[worker] selecting model={MODEL}", flush=True)
-            await select_model(page, MODEL)
-            print("[worker] model ready; sending question", flush=True)
-            messages = page.locator('[id^="message-"]')
-            before = await messages.count()
-
-            # Exactly one user message is sent to GPT+ in this workflow run.
-            await chat.fill(QUESTION)
-            await chat.press("Enter")
-
-            print("[worker] waiting for assistant response", flush=True)
-            answer = await wait_for_answer(page, before)
-            print("[worker] assistant response received", flush=True)
+            auth_header = await capture_authorization(page, token)
 
             await context.close()
             await browser.close()
+
+        answer = await call_gptplus(auth_header, messages)
+        print("[worker] GPT+ completion received", flush=True)
 
         save({
             "status": "ok",
@@ -247,6 +256,7 @@ async def run():
         return 0
 
     except Exception as exc:
+        print(f"[worker] error: {exc}", flush=True)
         save({
             "status": "error",
             "request_id": REQUEST_ID,
