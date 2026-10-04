@@ -23,7 +23,10 @@ on:
         type: string
 
 concurrency:
-  group: metodbox-on-demand-api-single-request
+  # Cline may create several requests close together. A fixed concurrency group
+  # causes GitHub to cancel an older pending run when a newer pending run arrives.
+  # Use the request id so every accepted API request gets its own runner/artifact.
+  group: metodbox-on-demand-api-${{ github.event.client_payload.request_id || inputs.request_id || github.run_id }}
   cancel-in-progress: false
 
 permissions:
