@@ -4,7 +4,7 @@ import { dotPage } from "./dot-ui.js";
 import { teamPage } from "./dot-team-ui.js";
 import { mainPcId, rosterFor, getAuthorizedAgent, createAgents, runAgentsInParallel, updateAgentReports, MAX_AGENTS } from "./dot-agents.js";
 import { getRoster, updateRoster } from "./threadhub.js";
-import { createThread, getThread, putThread, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
+import { createThread, getThread, appendThreadMessages, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
 
 const AGENT_ID = "metodbox-dot";
 const DEFAULT_MODEL = "gpt-5.1";
@@ -251,7 +251,7 @@ export async function handleDotRequest(request,env,url,callModel) {
       const result=await answerFromModel(env,callModel,prev,text,id);
       const appended=[...prev,{id:crypto.randomUUID(),role:"user",content:text},{id:crypto.randomUUID(),role:"assistant",content:result}];
       let saved=true;
-      try{await putThread(env,id,{agentId:AGENT_ID,messages:appended,title:thread.title==="Yeni konuşma"?text.slice(0,70):thread.title});}
+      try{await appendThreadMessages(env,id,appended.slice(-2),{title:text.slice(0,70)});}
       catch(e){saved=false;console.error("Dot history save failed",errorText(e));}
       return reply({content:result,saved});
     }
