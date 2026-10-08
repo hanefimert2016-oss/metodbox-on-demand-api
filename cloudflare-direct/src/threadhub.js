@@ -465,7 +465,7 @@ async function triggerDispatch(env, eventType, payload) {
   }
 }
 
-async function readPcState(env, agentId) {
+export async function readPcState(env, agentId) {
   const id = safeId(agentId, "agent id");
   const raw = await env.AUTH_KV.get(PC_PREFIX + id);
   if (!raw) {
@@ -504,7 +504,7 @@ async function listPcStates(env) {
   return results;
 }
 
-async function ensurePc(env, agentId) {
+export async function ensurePc(env, agentId) {
   const id = safeId(agentId, "agent id");
   const state = await readPcState(env, id);
   if (state.status === "running" && state.url) return state;
@@ -525,7 +525,7 @@ async function ensurePc(env, agentId) {
   return readPcState(env, id);
 }
 
-async function stopPc(env, agentId) {
+export async function stopPc(env, agentId) {
   const id = safeId(agentId, "agent id");
   await env.AUTH_KV.put(PC_STOP_PREFIX + id, "1", { expirationTtl: 15 * 60 });
   const current = await readPcState(env, id);
