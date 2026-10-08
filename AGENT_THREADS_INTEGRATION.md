@@ -1,136 +1,116 @@
-# Metodbox API + OpenDots ThreadHub + Dedicated Agent PCs
+# Metodbox — ONE GitHub token, no ngrok, custom ThreadHub, per-agent PC
 
-## What is the MAIN repository?
+## Fixed repositories
 
-**Public control/code repo:** `hanefimert2016-oss/metodbox-on-demand-api`
+| Purpose | Repository | Branch |
+|---|---|---|
+| Main code, Cloudflare Worker, GitHub Actions | `hanefimert2016-oss/metodbox-on-demand-api` | `main` |
+| Encrypted conversation + agent files ONLY | `hanefimert2016-oss/Metodbox-secret-system` | `agent-data` |
 
-**Private encrypted data repo:** `hanefimert2016-oss/ai-application-suite-1` on **`agent-data`** branch.
-Data is NOT written to the public control repo by the upgraded launchers.
-The older `agent_threads/` code in the private repo was an experimental prototype;
-**do not deploy its `mert-agent-threads` Worker or agent-pc workflow**.
-The integrated implementation in this repository is canonical.
+**Do not change the main repository.** The old `ai-application-suite-1` agent_threads experiment is not the canonical implementation.
 
-## Architecture
+**IMPORTANT:** Metodbox-secret-system was created as **PUBLIC**. Before running, change it to
+**PRIVATE** in its GitHub Settings → General → Danger Zone → Change repository visibility → Private.
+The Cloudflare ThreadHub **refuses** to read/write when storage is public. Agent launchers refuse
+to clone the public storage repository.
 
-```text
-OpenDots (GitHub Actions runtime)        OpenBot (legacy Intelligence adapter)
-   |                  \                    |
-   |  SSE/Chat         \ agent PC            | model
-   v                    v                   v
-Cloudflare Worker: metodbox-direct-api (EXISTING WORKER)
-  /v1/chat/completions  --> GPT+ Metodbox gpt-5.1
-  /api/threadhub/*      --> AES-GCM encrypted GitHub thread files
-  /api/pc/*             --> public repository_dispatch (launch_agent_pc)
-                                |
-                       github.com/metodbox-on-demand-api
-                         GitHub-hosted Ubuntu runner PER AGENT
-                           -> OpenBot agent-computer Docker container
-                           -> terminal / browser / workspace / temporary tunnel
-                           -> encrypted workspace checkpoint
-                                |
-                                v
-              PRIVATE ai-application-suite-1 @ agent-data
-              agent-storage/threads/*.enc.json
-              agent-storage/pcs/<agent-id>/state.tar.gz.enc
-              agent-storage/apps/opendots/state.tar.gz.enc
-```
+## Existing Cloudflare endpoint — no ngrok required
 
-Agent PCs are **ephemeral GitHub-hosted VMs**, not always-on physical PCs.
-Different agent IDs can get separate jobs, subject to GitHub concurrency/billing quotas.
-Workspaces are restored from encrypted checkpoints if one exists.
+- Portal login: https://metodbox-direct-api.hanefimert2016.workers.dev/apps
+- OpenAI-compatible model API: https://metodbox-direct-api.hanefimert2016.workers.dev/v1
+- ThreadHub: `/api/threadhub/threads`
+- Agent PC supervisor: `/api/pc/computers`
 
-The existing `manual-api-server.yml` and ngrok URL remain unchanged.
-The existing `cloudflare-direct/src/index.js`, `portal.js`,
-`threadhub.js`, `patch-opendots.py`, and OpenDots UI are reused.
+Login: **username `admin`**, password is **set locally to the requested `2026`** by your terminal.
+No login credentials are committed to public source. Session cookies are signed and marked Secure/HttpOnly.
+A best-effort IP-based 5-attempt / 15-minute login limit is active. Because 2026 is an easily guessed
+password, change it to a strong unique value after initial testing. For broader internet exposure
+Cloudflare Access and multi-factor authentication are strongly recommended.
 
-## One-time token setup on YOUR Arch Linux PC
+The **existing** Cloudflare Worker is always the front door. The earlier
+`manual-api-server.yml` ngrok workflow is legacy and **not needed** for this implementation.
+GitHub-hosted OpenDots and per-agent computers still use **cloudflared Quick Tunnels**
+(`trycloudflare.com`) to expose ephemeral UI processes; **Cloudflare Quick Tunnels are not ngrok**,
+but are temporary addresses and not a production high-availability network.
 
-You need two distinct **GitHub fine-grained Personal Access Tokens (PATs)**:
+## One-time local setup on Arch Linux
 
-1. **PRIVATE data token** restricted to `ai-application-suite-1`, `Contents: Read and write`.
-   It is saved in the public control repo **Actions Secrets** as `AGENT_STORAGE_TOKEN`,
-   and securely copied into Cloudflare as Worker secret `GITHUB_STORAGE_TOKEN`.
-2. **PUBLIC dispatch token** restricted to `metodbox-on-demand-api`, `Contents: Read and write`
-   (GitHub requires this to call `repository_dispatch`). It is saved as
-   Actions secret `AGENT_DISPATCH_TOKEN` and securely copied to Cloudflare as
-   Worker secret `GITHUB_TRIGGER_TOKEN`.
+First, change the **storage** repository to PRIVATE.
 
-Your existing public repo should already have `API_KEY`, `METODBOX_TOKEN`,
-`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`; these are not overwritten.
+Create **ONE** GitHub fine-grained PAT at https://github.com/settings/personal-access-tokens/new:
 
-Run the checked-in local setup script on your own PC:
+- Repository access: **Only select repositories**, selecting BOTH
+  `metodbox-on-demand-api` and `Metodbox-secret-system`.
+- Repository permissions: **Contents — Read and write** (Metadata: Read is automatic).
+- This same token performs encrypted GitHub storage operations and dispatches agent jobs.
+
+Existing `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `API_KEY` secrets on the
+**main repo** are reused. They do not require a new PAT and are not overwritten.
 
 ```bash
 sudo pacman -S --needed github-cli openssl
-gh auth status || gh auth login --hostname github.com --git-protocol https --web
+gh auth status || gh auth login --web
 gh api repos/hanefimert2016-oss/metodbox-on-demand-api/contents/github-runtime/setup-private-storage.sh \
   --jq .content | base64 -d > /tmp/setup-private-storage.sh
+
+# Review what runs locally
 less /tmp/setup-private-storage.sh
+
 bash /tmp/setup-private-storage.sh
 ```
 
-The script prompts for two PATs with echo disabled and uploads them using stdin
-(not arguments, not commits). **Never paste tokens into ChatGPT.**
+The script asks for **one GitHub PAT** and your portal password in invisible prompts. Enter
+`2026` for the requested initial password. It sets the main repo Actions secrets:
 
-Then in **metodbox-on-demand-api > Actions > Configure Private Thread Storage > Run workflow**:
-https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/configure-private-storage.yml
+- `AGENT_STORAGE_TOKEN`: your single fine-grained PAT
+- `PORTAL_PASSWORD`: password entered locally
+- `PORTAL_SESSION_SECRET`: randomly generated only if missing
+- `STORAGE_ENCRYPTION_KEY`: randomly generated only if missing
 
-It checks the private data repo, then configures these Cloudflare Worker secrets:
+**Never rotate STORAGE_ENCRYPTION_KEY without migrating/encrypting previous stored data.**
+The portal session secret and encryption secret are independent.
 
-- `GITHUB_STORAGE_TOKEN` (private repo PAT)
-- `GITHUB_STORAGE_REPO` = `hanefimert2016-oss/ai-application-suite-1`
-- `GITHUB_STORAGE_BRANCH` = `agent-data`
-- `GITHUB_LAUNCH_REPO` = `hanefimert2016-oss/metodbox-on-demand-api`
-- `GITHUB_TRIGGER_TOKEN` (public repo dispatch PAT)
+Then open https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/configure-private-storage.yml
+and run **Configure Private Thread Storage** once. It checks storage privacy and deploys
+these existing Worker secrets using Wrangler:
 
-**Important:** The ThreadHub encryption secret (`STORAGE_ENCRYPTION_KEY` or the existing fallback)
-must remain consistent across migrations. Do not rotate it without decrypt/re-encrypt,
-or old histories become unreadable.
+- `GITHUB_STORAGE_TOKEN`: same one PAT
+- `GITHUB_TRIGGER_TOKEN`: same one PAT
+- `GITHUB_STORAGE_REPO`: new storage-only repository
+- `GITHUB_STORAGE_BRANCH`: `agent-data`
+- `GITHUB_LAUNCH_REPO`: unchanged main repository
+- `PORTAL_USERNAME`: `admin`
+- `PORTAL_PASSWORD`, `PORTAL_SESSION_SECRET`, `STORAGE_ENCRYPTION_KEY`
 
-## Launch apps and separate agent PCs
+## What persists
 
-- **Actions > Launch Copilot App > Run workflow**: select `opendots`.
-  It uses `THREADHUB_URL`, `THREADHUB_TOKEN` and our custom fork,
-  not paid Intelligence conversation storage.
-- **Actions > Agent PC > Run workflow**: give an `agent_id` such as `coder`.
-  Alternatively OpenDots calls `POST /api/pc/computers/coder/ensure`
-  to schedule that job via `repository_dispatch`.
-- `POST /api/pc/computers/coder/stop` requests a graceful stop (next KV poll).
-- The agent desktop is accessed through its **authenticated** temporary tunnel;
-  its encrypted disk-like workspace checkpoint stays in the private repo.
-- The OpenBot GUI still depends on an upstream Intelligence adapter;
-  **only OpenDots** has been adapted to our custom ThreadHub. OpenBot migration
-  remains separate work.
+- `agent-storage/threads/*.enc.json`: AES-GCM encrypted thread history
+- `agent-storage/pcs/<agent-id>/state.tar.gz.enc`: encrypted PC state snapshots
+- `agent-storage/apps/opendots/state.tar.gz.enc`: encrypted OpenDots state
 
-## Test the existing Worker
+The existing OpenDots fork (`github-runtime/patch-opendots.py`) saves chat histories to
+ThreadHub; the `Agent PC` workflow assigns an individual, temporary GitHub-hosted
+Ubuntu computer with its own Docker agent-computer container to each `agent_id`.
+Start OpenDots from **Launch Copilot App**. OpenBot still has a separate upstream
+CopilotKit Intelligence dependency. Neither GitHub runner nor cloudflared tunnel remains
+permanently online.
 
+Manual/API tests:
 ```bash
-export API_URL="https://metodbox-direct-api.hanefimert2016.workers.dev"
-read -rsp 'Metodbox API key: ' API_KEY; echo
-curl -fsS "$API_URL/api/threadhub/health" -H "Authorization: Bearer $API_KEY"
-curl -fsS "$API_URL/api/threadhub/threads" -H "Authorization: Bearer $API_KEY"
-curl -fsS "$API_URL/api/pc/computers" -H "Authorization: Bearer $API_KEY"
-unset API_KEY
+curl -fsS https://metodbox-direct-api.hanefimert2016.workers.dev/health
+# After configuring API_KEY as an environment variable:
+curl -fsS -H "Authorization: Bearer $API_KEY" \
+  https://metodbox-direct-api.hanefimert2016.workers.dev/api/threadhub/health
 ```
 
-The `health` response should report
-`storage: github-encrypted`, `repo: hanefimert2016-oss/ai-application-suite-1`,
-and `branch: agent-data` **after** completing the configuration workflow.
+## Limits and privacy
 
-The `Test Private Thread and Agent Storage` GitHub Actions workflow includes
-mocked GitHub tests verifying that threads go to private storage and computer
-dispatches go to the public code repository.
-
-## Boundaries and known limitations
-
-- The private data branch is encrypted for thread JSON by AES-GCM and for
-  agent PC backups by OpenSSL AES-256-CBC with PBKDF2 (legacy compatibility).
-  AES-CBC lacks an authentication tag; upgrading that backup format is future work.
-- GitHub storage is **not an infinite database**: API limits, file-size limits,
-  history growth and action compute quotas all apply.
-- GitHub-hosted runners terminate after a maximum of 6 hours; workflow timeouts
-  are currently configured below that.
-- Public GitHub history that already contains old encrypted backups remains
-  public. Moving future data to the private repository does not erase prior commits.
-- This change does not start, test the live model, or deploy any running computer
-  until the required account secrets are configured and a workflow is run.
+- GitHub has Git object limits, history-growth costs, API rate limits and runner quotas.
+- The encrypted GitHub files cannot be queried as fast as a database. Store the large
+  generated artifacts outside GitHub or add dedicated storage later.
+- Encryption protects at-rest data but the Worker and agent process can decrypt it.
+- Agent PC backups currently use AES-CBC+PBKDF2 for backwards compatibility;
+  authenticated encryption is a future improvement.
+- The Metodbox model bridge is unchanged. Backend model naming does not prove provider identity.
+- Real Cloudflare deployment and live login are **not verified** until the one-PAT
+  setup and configuration workflow complete successfully.
