@@ -1,5 +1,57 @@
 # Metodbox Dot — Kendi Hafif AI Asistanımız
 
+## Çoklu agent ve ayrı kalıcı PC sistemi
+
+**Mobil giriş:** <https://metodbox-direct-api.hanefimert2016.workers.dev/dot>. Giriş
+yapmadıysan aynı sayfada admin formu çıkar; girişten sonra doğrudan Dot açılır.
+Alan adının kök adresi de normal telefon tarayıcılarında /dot'a yönlenir.
+
+- **Her yeni sohbetin ana bilgisayarı:** `ch-<conversation-uuid>`. Yeni
+  sohbet oluşturulduğunda PC başlatma isteği Github Actions'a otomatik gönderilir;
+  sohbet için bilgisayarın açılmasını beklemek gerekmez.
+- **Alt agentlar:** `ch-<conversation-uuid>-a1` ... `-a6`. Her biri kendi
+  izole Docker bilgisayarını, Chromium oturumunu, `/workspace` dosyalarını,
+  terminalini ve tarayıcısını taşır. Bir chat'in PC ID'sini başka chat'ten
+  kullanmaya izin verilmez.
+- **Ana agent yönetimi:** Sohbette ana Dot araçlarla aynı turda 1-3 yeni alt
+  agent oluşturabilir ve görevlerini GPT+ modeline **eşzamanlı** gönderebilir.
+  Manuel **◈ Ekip** panelinden agent oluşturma, paralel çalıştırma,
+  rapor görüntüleme, PC başlat/durdur, tarayıcıda site açma,
+  web araması, ekran görüntüsü ve terminal kontrolü yapılır.
+- **Ekip sayfası:** `/dot/team?chatId=<sohbet-id>`, yalnızca oturum açmış
+  hesap ve o sohbete ait agent/PC yetkisiyle çalışır.
+- **Agent sayısı:** sohbet başına en fazla 6 alt agent ve aynı görev turunda
+  en fazla 3 model isteği. GitHub Actions runner eşzamanlılık/ücretsiz dakika
+  limitleri ayrıca uygulanır.
+- **Terminal güvenliği:** Doğrudan terminal komutu, portal şifresi en az 12
+  karakterse ve arayüzde kullanıcı onayıyla çalışır. *Otonom* alt agent
+  komutları ayrıca her sohbet için varsayılan kapalı **terminal izni**
+  etkinleştirilirse kullanılabilir.
+- **Sohbet ve agent görevleri:** AES-256-GCM şifreli thread ve
+  `agent-storage/rosters/<sohbet-id>.enc.json` dosyaları hâlâ PRIVATE
+  `hanefimert2016-oss/Metodbox-secret-system` `agent-data` dalında tutulur.
+- **PC checkpoint:** Her PC'nin `agent-storage/pcs/<agent-id>/state.tar.gz.enc`
+  dosyası kendi ayrılmış şifreli yedeğidir. PC kapanırken ve 15 dakikada
+  bir yedekleme denenir. Yedek okunamazsa önceki yedek silinmez.
+  GitHub'da tek dosya için uygulanan 80 MiB koruma sınırı nedeniyle
+  büyük tarayıcı profilleri saklanamayabilir: bu durumda yalnız workspace
+  yedeklenir; workspace de sınırı aşarsa uyarı çıkar ve eski yedek korunur.
+  **Kesintisiz kalıcı VM veya kayıpsız yedek garantisi değildir.**
+- **Aynı model, farklı PC:** Bütün agentlar mevcut Metodbox GPT+ model
+  gateway'ini kullanır; *aynı bilgisayar veya terminal oturumunu paylaşmazlar*.
+
+### Doğrulama bağlantıları
+
+- [Canlı iki sohbet / iki alt agent / paralel model yanıtı / PC izolasyonu](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-live-dot-multiagent.yml)
+- [Mock paralellik, mobil JS ve PC güvenliği testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-private-thread-storage.yml)
+- [Gerçek PC tarayıcısı ve ekran görüntüsü](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-native-dot-pc.yml)
+
+İpucu: **Dot açılmazsa** dış Chrome tarayıcısında yukarıdaki /dot adresini
+açıp admin girişi yap, eski OpenDots bağlantısını kullanma. Mikrofon erişimi
+için HTTPS tarayıcı izni gereklidir.
+
+
+
 **Aktif sistem:** <https://metodbox-direct-api.hanefimert2016.workers.dev/dot>
 
 Kod ve API hâlâ **[metodbox-on-demand-api](https://github.com/hanefimert2016-oss/metodbox-on-demand-api)** ana reposunda. Şifreli sohbet geçmişi ve PC yedekleri yalnızca **özel [Metodbox-secret-system](https://github.com/hanefimert2016-oss/Metodbox-secret-system)** deposunun `agent-data` dalında saklanır. Yeni bir repo açılmadı veya mevcut repoların rolü değiştirilmedi.
