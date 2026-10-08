@@ -1,65 +1,20 @@
-name: Launch Copilot App
+name: Legacy OpenDots/OpenBot (Retired)
 
+# Metodbox Dot is always available at the existing Cloudflare Worker /dot.
+# Keeping this tombstone workflow prevents old repository_dispatch events
+# from consuming runners or restoring retired CopilotKit applications.
 on:
-  repository_dispatch:
-    types: [launch_copilot_app]
   workflow_dispatch:
-    inputs:
-      app:
-        description: App to launch
-        required: true
-        type: choice
-        options:
-          - openbot
-          - opendots
 
 permissions:
   contents: read
 
-concurrency:
-  group: copilot-runtime-${{ github.event.client_payload.app || inputs.app }}
-  cancel-in-progress: true
-
 jobs:
-  launch:
+  retired:
     runs-on: ubuntu-24.04
-    timeout-minutes: 350
-    env:
-      APP: ${{ github.event.client_payload.app || inputs.app }}
-      AGENT_STORAGE_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
-      AGENT_STORAGE_REPO: hanefimert2016-oss/Metodbox-secret-system
-      AGENT_STORAGE_BRANCH: agent-data
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      METODBOX_API_KEY: ${{ secrets.API_KEY }}
-      CPK_INTELLIGENCE_API_KEY: ${{ secrets.CPK_INTELLIGENCE_API_KEY }}
-      VOICE_API_KEY: ${{ secrets.VOICE_API_KEY }}
-      VOICE_MODEL: ${{ vars.VOICE_MODEL || 'gpt-realtime-2.1' }}
-      VOICE_NAME: ${{ vars.VOICE_NAME || 'marin' }}
+    timeout-minutes: 1
     steps:
-      - name: Checkout launcher
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Install launcher dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Restore prebuilt OpenDots (skip install + compile when cached)
-        if: env.APP == 'opendots'
-        id: opendots_cache
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/opendots
-          key: opendots-built-ubuntu24-node24-625452e0-${{ hashFiles('github-runtime/patch-opendots.py', 'github-runtime/opendots-threadhub.ts', 'github-runtime/opendots-overlay/**') }}
-
-      - name: Launch selected app
-        env:
-          OPENDOTS_CACHE_HIT: ${{ steps.opendots_cache.outputs.cache-hit }}
-        run: bash github-runtime/launch-copilot-app.sh "$APP"
+      - name: Use native Metodbox Dot
+        run: |
+          echo "::notice::OpenDots/OpenBot runners have been retired. Use the native Cloudflare Dot."
+          echo "https://metodbox-direct-api.hanefimert2016.workers.dev/dot"
