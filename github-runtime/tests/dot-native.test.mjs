@@ -71,8 +71,8 @@ function githubStub(){
 test("native Dot rejects unauthorized requests", async()=>{
   const e=env();
   const res=await handleDotRequest(req("GET","/dot"),e,url("/dot"),async()=>{throw Error("model must not be called")});
-  assert.equal(res.status,302);
-  assert.equal(res.headers.get("location"),base+"/apps");
+  assert.equal(res.status,200);
+  assert.match(await res.text(),/return_to/);
   const data=await handleDotRequest(req("POST","/dot/api/message",{text:"hello"}),e,url("/dot/api/message"),async()=>{throw Error("model must not be called")});
   assert.equal(data.status,401);
 });
@@ -123,10 +123,18 @@ test("native Dot refuses cross-origin authenticated POST",async()=>{
   const res=await handleDotRequest(r,e,url("/dot/api/pc/start"),async()=>{});
   assert.equal(res.status,403);
 });
-test("weak password cannot grant terminal/shell access",async()=>{
-  const e=env();e.PORTAL_PASSWORD="2026";const cookie=await login(e);
-  const path="/dot/api/pc/exec";
-  const res=await handleDotRequest(req("POST",path,{command:"pwd"},cookie),e,url(path),async()=>{});
-  assert.equal(res.status,403);
-  assert.match((await res.json()).error,/12/);
+test("weak password cannot grant remote terminal, even for its own chat",async()=>{
+  const stub=githubStub(),old=globalThis.fetch;
+  globalThis.fetch=stub.fetch;
+  try{
+    const e=env();e.PORTAL_PASSWORD="2026";const cookie=await login(e);
+    const path="/dot/api/threads";
+    const created=await handleDotRequest(req("POST",path,{title:"Weak pass test"},cookie),e,url(path),async()=>{});
+    assert.equal(created.status,201);
+    const t=await created.json();
+    const execPath="/dot/api/pc/exec";
+    const res=await handleDotRequest(req("POST",execPath,{chatId:t.id,command:"pwd"},cookie),e,url(execPath),async()=>{});
+    assert.equal(res.status,403);
+    assert.match((await res.json()).error,/12/);
+  }finally{globalThis.fetch=old}
 });
