@@ -1,6 +1,7 @@
 import { verifySession } from "./portal.js";
 import { edgeSynthesize } from "./edge-tts.js";
 import { dotPage } from "./dot-ui.js";
+import { teamPage } from "./dot-team-ui.js";
 import { mainPcId, rosterFor, getAuthorizedAgent, createAgents, runAgentsInParallel, updateAgentReports, MAX_AGENTS } from "./dot-agents.js";
 import { getRoster, saveRoster } from "./threadhub.js";
 import { createThread, getThread, putThread, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
@@ -166,12 +167,15 @@ async function parseBody(request, max=9000) {
   return JSON.parse(text||"{}");
 }
 export async function handleDotRequest(request,env,url,callModel) {
-  if(!(url.pathname==="/dot"||url.pathname==="/dot/"||url.pathname.startsWith("/dot/api/")))return null;
+  if(!(url.pathname==="/dot"||url.pathname==="/dot/"||url.pathname==="/dot/team"||url.pathname.startsWith("/dot/api/")))return null;
   if(!await authorized(request,env)){
-    if(url.pathname.startsWith("/dot/api/"))return reply({error:"Oturum gerekli. /apps adresinden giriş yap."},401);
-    return Response.redirect(url.origin+"/apps",302);
+    if(url.pathname.startsWith("/dot/api/"))return reply({error:"Oturum gerekli. /dot adresinden giriş yap."},401);
+    // A single direct /dot link works on Android even with a fresh cookie jar.
+    const login = `<!doctype html><html lang="tr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Metodbox Dot · Giriş</title><style>body{margin:0;min-height:100dvh;background:#08111e;color:#edf5ff;font:16px system-ui;display:grid;place-items:center}.box{width:min(420px,90vw);padding:28px;background:#142239;border:1px solid #3a5378;border-radius:22px;box-shadow:0 20px 80px #0008}h1{margin:0 0 12px}input,button{width:100%;box-sizing:border-box;border:1px solid #4b6284;padding:14px;margin-top:12px;border-radius:12px;color:white;background:#101a2b;font:inherit}button{background:#4679e5;cursor:pointer}p{color:#b5c8e5;line-height:1.5}</style><div class="box"><h1>✦ Metodbox Dot</h1><p>Doğrudan giriş yapıp kendi Dot'unu aç. OpenDots veya GitHub uygulaması başlatman gerekmiyor.</p><form action="/apps/login" method="post"><input name="username" placeholder="Kullanıcı adı" autocomplete="username" required><input name="password" type="password" placeholder="Şifre" autocomplete="current-password" required><input name="return_to" type="hidden" value="/dot"><button type="submit">Dot'u Aç →</button></form><p style="font-size:12px">Giriş başarısız olursa mevcut şifreni veya 15 dakikalık deneme kilidini kontrol et.</p></div></html>`;
+    return new Response(login,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","Content-Security-Policy":"default-src 'none';style-src 'unsafe-inline';form-action 'self';base-uri 'none'"}});
   }
   if((url.pathname==="/dot"||url.pathname==="/dot/")&&request.method==="GET")return dotPage();
+  if(url.pathname==="/dot/team"&&request.method==="GET")return teamPage();
   if(!url.pathname.startsWith("/dot/api/"))return reply({error:"Not found"},404);
   if(request.method!=="GET"&&!correctOrigin(request,url))return reply({error:"Cross-origin request denied"},403);
   try {
