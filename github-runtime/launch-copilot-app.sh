@@ -234,6 +234,12 @@ OPENAI_API_KEY=$METODBOX_API_KEY
 OPENAI_BASE_URL=$WORKER_BASE/v1
 OPENAI_MODEL=gpt-5.1
 
+# Browser WebRTC voice calls use a separate OpenAI Realtime provider.
+# Do not confuse this with the GitHub token or the GPT+ proxy key.
+VOICE_API_KEY=${VOICE_API_KEY:-}
+VOICE_MODEL=${VOICE_MODEL:-gpt-realtime-2.1}
+VOICE_NAME=${VOICE_NAME:-marin}
+
 COMPUTER_SUPERVISOR_URL=$WORKER_BASE/api/pc
 COMPUTER_SUPERVISOR_TOKEN=$METODBOX_API_KEY
 COMPUTER_TOKEN=$METODBOX_API_KEY
