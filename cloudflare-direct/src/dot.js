@@ -1,6 +1,8 @@
 import { verifySession } from "./portal.js";
 import { edgeSynthesize } from "./edge-tts.js";
 import { dotPage } from "./dot-ui.js";
+import { mainPcId, rosterFor, getAuthorizedAgent, createAgents, runAgentsInParallel, updateAgentReports, MAX_AGENTS } from "./dot-agents.js";
+import { getRoster, saveRoster } from "./threadhub.js";
 import { createThread, getThread, putThread, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
 
 const AGENT_ID = "metodbox-dot";
@@ -17,8 +19,8 @@ function correctOrigin(request, url) {
   const origin = request.headers.get("Origin");
   return origin === url.origin;
 }
-async function pcState(env) {
-  return readPcState(env, AGENT_ID);
+async function pcState(env,agentId) {
+  return readPcState(env,agentId);
 }
 function pcUrl(state) {
   if (state.status !== "running" || !state.url) throw Error("Dot PC kapalı veya henüz hazırlanıyor. Önce PC Başlat.");
@@ -27,15 +29,15 @@ function pcUrl(state) {
     throw Error("Beklenmeyen PC ağ adresi. İşlem güvenlik nedeniyle durduruldu.");
   return base.origin;
 }
-async function computerToken(env) {
+async function computerToken(env,agentId) {
   const secret=String(env.API_KEY||"");
   if(!secret)throw Error("API_KEY eksik");
   const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  const data=new TextEncoder().encode("opendots-computer:"+AGENT_ID);
+  const data=new TextEncoder().encode("opendots-computer:"+agentId);
   return [...new Uint8Array(await crypto.subtle.sign("HMAC",key,data))].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
-async function computerCall(env, kind, body) {
-  const current=await pcState(env);
+async function computerCall(env, kind, body,agentId) {
+  const current=await pcState(env,agentId);
   const target=pcUrl(current);
   const allowed = { screenshot:["GET","/screenshot"], navigate:["POST","/navigate"], exec:["POST","/exec"], snapshot:["POST","/snapshot"] };
   const route=allowed[kind];
@@ -43,7 +45,7 @@ async function computerCall(env, kind, body) {
   const [method,path]=route;
   const response=await fetch(target+path,{
     method,
-    headers:{Authorization:"Bearer "+await computerToken(env),"x-openbot-bot-id":AGENT_ID,"Content-Type":"application/json"},
+    headers:{Authorization:"Bearer "+await computerToken(env,agentId),"x-openbot-bot-id":agentId,"Content-Type":"application/json"},
     ...(method==="POST"?{body:JSON.stringify(body||{})}:{}),
     // Cloudflare Workers supports follow/manual, not redirect:error.
     // Manual still refuses any 3xx redirect because response.ok is false.
@@ -67,50 +69,96 @@ function validatePublicUrl(value){
   if(url.toString().length>2000)throw Error("URL çok uzun.");
   return url.href;
 }
-function tools() {
-  return [
-    {type:"function",function:{name:"dot_pc_status",description:"Check the status of the user's isolated Dot PC on GitHub Actions.",parameters:{type:"object",properties:{},additionalProperties:false}}},
-    {type:"function",function:{name:"dot_pc_start",description:"Start the user's isolated Dot PC on GitHub Actions if they asked for computer help.",parameters:{type:"object",properties:{},additionalProperties:false}}},
-    {type:"function",function:{name:"dot_pc_navigate",description:"Open a public webpage in the running Dot PC Chromium and return extracted page text. Only for the user's requested interactive computer/browser task.",parameters:{type:"object",properties:{url:{type:"string",description:"Full public http/https URL"}},required:["url"],additionalProperties:false}}},
+// Tool definitions are dynamically scoped: every chat owns one parent PC and
+// every child owns a completely separate GitHub Actions computer.
+function modelTools(isMain, allowExec) {
+  const common=[
+    {type:"function",function:{name:"dot_pc_status",description:"Check this agent's personal GitHub PC status.",parameters:{type:"object",properties:{}}}},
+    {type:"function",function:{name:"dot_pc_start",description:"Start or resume this agent's own isolated PC.",parameters:{type:"object",properties:{}}}},
+    {type:"function",function:{name:"dot_pc_navigate",description:"Read a publicly accessible website in this agent's PC browser.",parameters:{type:"object",properties:{url:{type:"string"}},required:["url"]}}},
+    {type:"function",function:{name:"dot_web_search",description:"Search the public web using your own Chromium browser. The PC must be ready.",parameters:{type:"object",properties:{query:{type:"string"}},required:["query"]}}},
   ];
+  if(allowExec)common.push({type:"function",function:{name:"dot_pc_exec",description:"Run an authorized shell command in this agent's isolated PC. Only when directly relevant to the user's task; never retrieve/exfiltrate credentials.",parameters:{type:"object",properties:{command:{type:"string"}},required:["command"]}}});
+  if(isMain)common.push({type:"function",function:{name:"dot_spawn_agents",description:"Create 1-3 child agents, each with separate persistent PC and independent simultaneous GPT+ model request. Delegate separate concrete subtasks and summarize their results.",parameters:{type:"object",properties:{agents:{type:"array",minItems:1,maxItems:3,items:{type:"object",properties:{name:{type:"string"},task:{type:"string"}},required:["task"]}}},required:["agents"]}}});
+  return common;
 }
-async function executeTool(name,args,env){
-  if(name==="dot_pc_status")return pcState(env);
-  if(name==="dot_pc_start")return ensurePc(env,AGENT_ID);
+function modelText(item) {
+  return typeof item?.content==="string"?item.content:
+    Array.isArray(item?.content)?item.content.map(i=>i.text||"").join(""):"";
+}
+async function executeAgentTool(name,args,context) {
+  const {env,chatId,agentId,callModel,allowSpawn,allowExec}=context;
+  if(name==="dot_pc_status")return pcState(env,agentId);
+  if(name==="dot_pc_start")return ensurePc(env,agentId);
   if(name==="dot_pc_navigate"){
-    if(typeof args?.url!=="string")throw Error("URL gerekiyor");
-    const data=await computerCall(env,"navigate",{url:validatePublicUrl(args.url)});
-    return {url:data.url,title:data.title,text:String(data.text||"").slice(0,7000)};
+    const d=await computerCall(env,"navigate",{url:validatePublicUrl(args?.url)},agentId);
+    return {url:d.url,title:d.title,text:String(d.text||"").slice(0,8500)};
   }
-  throw Error("Unknown Dot tool");
+  if(name==="dot_web_search"){
+    const query=String(args?.query||"").trim().slice(0,200);
+    if(!query)throw Error("Search query is required");
+    const d=await computerCall(env,"navigate",{url:"https://www.google.com/search?q="+encodeURIComponent(query)},agentId);
+    return {query,title:d.title,url:d.url,text:String(d.text||"").slice(0,8500)};
+  }
+  if(name==="dot_pc_exec" && allowExec){
+    const command=String(args?.command||"");
+    if(!command.trim()||command.length>1200)throw Error("Command length exceeds limit");
+    const result=await computerCall(env,"exec",{command,timeoutMs:20000},agentId);
+    return {exitCode:result.exitCode,stdout:String(result.stdout||"").slice(0,8500),stderr:String(result.stderr||"").slice(0,2000)};
+  }
+  if(name==="dot_spawn_agents" && allowSpawn){
+    const specs=args?.agents;
+    const res=await runAgentsInParallel(env,chatId,specs, async child=>runAgentTask(env,callModel,chatId,child,allowExec));
+    return {agents:res,parallel:true};
+  }
+  throw Error("Unknown or unauthorized tool: "+name);
 }
-async function answerFromModel(env, callModel, history, text) {
-  const messages=[
-    {role:"system",content:"Sen Metodbox Dot'sun. Türkçe ve doğal konuş. Kullanıcının kendi sanal Dot bilgisayarı yalnızca izin verilmiş izole GitHub Actions PC'dir. Kullanıcı isterse dot_pc_start ve dot_pc_navigate araçlarını kullan. Sonuç gelmeden bilgisayara eriştiğini iddia etme. Kullanıcıdan sır, token, parola isteme. Telefonla görüşme metin olarak iletilir. Kısa, anlaşılır ve yardımcı yanıtlar ver."},
-    ...history.filter(m=>m&&["user","assistant"].includes(m.role)&&typeof m.content==="string").slice(-16).map(m=>({role:m.role,content:m.content.slice(0,5000)})),
-    {role:"user",content:text}
-  ];
-  const calls=tools();
-  for(let round=0;round<3;round++){
-    const data=await callModel({model:DEFAULT_MODEL,stream:false,max_completion_tokens:1100,messages,tools:calls,tool_choice:"auto"});
-    const item=data?.choices?.[0]?.message;
-    if(!item)throw Error("Model cevap formatı boş.");
-    if(!Array.isArray(item.tool_calls)||item.tool_calls.length===0){
-      const content=typeof item.content==="string"?item.content:Array.isArray(item.content)?item.content.map(i=>i.text||"").join(""):"";
+async function modelLoop(env,callModel,messages,context) {
+  const available=modelTools(context.allowSpawn,context.allowExec);
+  for(let round=0;round<4;round++){
+    const output=await callModel({
+      model:DEFAULT_MODEL,stream:false,max_completion_tokens:1600,
+      messages,tools:available,tool_choice:"auto",parallel_tool_calls:true
+    });
+    const assistant=output?.choices?.[0]?.message;
+    if(!assistant)throw Error("Model assistant reply is missing");
+    if(!Array.isArray(assistant.tool_calls)||!assistant.tool_calls.length){
+      const content=modelText(assistant);
       if(!content.trim())throw Error("Model boş cevap döndürdü.");
       return content;
     }
-    messages.push({role:"assistant",content:typeof item.content==="string"?item.content:"",tool_calls:item.tool_calls});
-    for(const call of item.tool_calls.slice(0,3)){
-      let result;
+    // Calls within one agent run in order; multiple child agents are concurrent.
+    const toolcalls=assistant.tool_calls.slice(0,3);
+    messages.push({role:"assistant",content:modelText(assistant),tool_calls:toolcalls});
+    for(const call of toolcalls){
+      let value;
       try{
-        const args=JSON.parse(call.function?.arguments||"{}");
-        result=await executeTool(call.function?.name,args,env);
-      }catch(error){result={error:errorText(error)};}
-      messages.push({role:"tool",tool_call_id:call.id,content:JSON.stringify(result).slice(0,8500)});
+        value=await executeAgentTool(call.function?.name,JSON.parse(call.function?.arguments||"{}"),context);
+      }catch(e){value={error:errorText(e)}}
+      messages.push({role:"tool",tool_call_id:call.id,content:JSON.stringify(value).slice(0,14500)});
     }
   }
-  return "İşlemleri kontrol ettim. Devam etmek için isteğini biraz daha ayrıntılı yazabilirsin.";
+  // Do not pretend success after exhausting tool rounds.
+  const last=messages.filter(m=>m.role==="tool").slice(-2);
+  return "Alt işlemlerin sonucu: "+last.map(m=>m.content.slice(0,1800)).join("\n");
+}
+async function runAgentTask(env,callModel,chatId,child,allowExec) {
+  const messages=[
+    {role:"system",content:"Sen Metodbox Dot'un bağımsız alt agentısın. Agent adı: "+child.name+
+      ". PC kimliğin: "+child.id+". Ana sohbete rapor vereceksin. Bilgisayar henüz başlatılıyorsa açıkça belirt; uydurma çıktı verme. Sadece verilen görevi tamamla. Kullanıcı parolalarını/sırlarını isteme veya paylaşma."},
+    {role:"user",content:child.task}
+  ];
+  return modelLoop(env,callModel,messages,{env,callModel,chatId,agentId:child.id,allowSpawn:false,allowExec});
+}
+async function answerFromModel(env,callModel,history,text,chatId) {
+  const roster=await getRoster(env,chatId);
+  const messages=[
+    {role:"system",content:"Sen Metodbox Dot ana agentsın. Bu sohbetin kendi ana PC kimliği "+mainPcId(chatId)+
+      ". Her yeni sohbet farklı PC açar, bu sohbetin tüm alt agentları ayrı PC/workspace kullanır. Gerekirse dot_spawn_agents aracıyla en çok 3 alt agentı aynı anda farklı görevlere yönlendir ve sonuçları birleştir. Mevcut "+roster.agents.length+" alt agent bulunuyor (üst sınır 6). Kendi bilgisayarın yalnızca GitHub Actions izole PC'dir; PC hazır değilken işlem yaptığını iddia etme. Terminal yetkisi "+(roster.allowExec?"kullanıcı tarafından onaylıdır.":"onaylanmamıştır.")+" Yanıtları Türkçe, anlaşılır ve dürüst ver."},
+    ...history.filter(m=>m&&["user","assistant"].includes(m.role)&&typeof m.content==="string").slice(-20).map(m=>({role:m.role,content:m.content.slice(0,5000)})),
+    {role:"user",content:text}
+  ];
+  return modelLoop(env,callModel,messages,{env,callModel,chatId,agentId:mainPcId(chatId),allowSpawn:roster.agents.length<MAX_AGENTS,allowExec:roster.allowExec&&String(env.PORTAL_PASSWORD||"").length>=12});
 }
 async function parseBody(request, max=9000) {
   const text=await request.text();
