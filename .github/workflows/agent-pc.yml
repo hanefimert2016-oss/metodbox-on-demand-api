@@ -1,0 +1,45 @@
+name: Agent PC
+
+on:
+  repository_dispatch:
+    types: [launch_agent_pc]
+  workflow_dispatch:
+    inputs:
+      agent_id:
+        description: Agent/Dot ID
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-pc-${{ github.event.client_payload.agent_id || inputs.agent_id }}
+  cancel-in-progress: false
+
+jobs:
+  computer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      AGENT_ID: ${{ github.event.client_payload.agent_id || inputs.agent_id }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      METODBOX_API_KEY: ${{ secrets.API_KEY }}
+    steps:
+      - name: Checkout control repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install control dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Start dedicated agent PC
+        run: bash github-runtime/launch-agent-pc.sh "$AGENT_ID"
