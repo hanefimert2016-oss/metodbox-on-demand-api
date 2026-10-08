@@ -13,6 +13,7 @@ WORKSPACE="$WORKROOT/workspace"
 PROFILES="$WORKROOT/profiles"
 DATA_DIR="/tmp/agent-data"
 ARCHIVE_PATH="$DATA_DIR/agent-storage/pcs/${AGENT_ID}/state.tar.gz.enc"
+source "$(dirname "${BASH_SOURCE[0]}")/storage-git.sh"
 
 if [[ ! "$AGENT_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
   echo "Invalid agent id: $AGENT_ID" >&2
@@ -67,9 +68,7 @@ PY
 }
 
 prepare_data_branch() {
-  rm -rf "$DATA_DIR"
-  git fetch origin agent-data:refs/remotes/origin/agent-data
-  git worktree add -B agent-data "$DATA_DIR" origin/agent-data
+  storage_clone "$DATA_DIR"
   mkdir -p "$(dirname "$ARCHIVE_PATH")"
 }
 
@@ -117,20 +116,12 @@ persist_state() {
   git -C "$DATA_DIR" config user.email "actions@users.noreply.github.com"
   git -C "$DATA_DIR" commit -m "storage: save PC state for ${AGENT_ID}"
 
-  for attempt in 1 2 3 4; do
-    git -C "$DATA_DIR" pull --rebase origin agent-data || {
-      git -C "$DATA_DIR" rebase --abort >/dev/null 2>&1 || true
-      sleep "$((attempt * 2))"
-      continue
-    }
-    if git -C "$DATA_DIR" push origin HEAD:agent-data; then
-      echo "Encrypted PC state persisted to GitHub."
-      return 0
-    fi
-    sleep "$((attempt * 2))"
-  done
-
-  echo "WARNING: PC state could not be pushed after retries." >&2
+  if storage_push "$DATA_DIR"; then
+    echo "Encrypted PC state persisted to the private repository."
+  else
+    echo "WARNING: Private PC state persistence FAILED. Check workflow logs." >&2
+    return 1
+  fi
   return 0
 }
 
