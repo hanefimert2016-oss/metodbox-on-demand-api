@@ -197,20 +197,26 @@ replace(
     if (!isReady) return;
     let active = true;
     void (async () => {
-      const persisted = await api<{ messages: Record<string, unknown>[] }>(
-        `/conversations/${thread.id}/messages`,
-      );
-      if (!active) return;
-
-      // A fresh useAgent has no durable history without Intelligence. Hydrate
-      // it from our ThreadHub before the runtime is connected.
-      if (agent.messages.length === 0) {
-        for (const message of persisted.messages)
-          agent.addMessage(
-            message as unknown as Parameters<typeof agent.addMessage>[0],
-          );
+      // Never block a live chat because GitHub thread history is temporarily
+      // unavailable. The user can still talk to the configured model.
+      try {
+        const persisted = await api<{ messages: Record<string, unknown>[] }>(
+          `/conversations/${thread.id}/messages`,
+        );
+        if (!active) return;
+        if (agent.messages.length === 0) {
+          for (const message of persisted.messages)
+            agent.addMessage(
+              message as unknown as Parameters<typeof agent.addMessage>[0],
+            );
+        }
+      } catch (e) {
+        if (active) setError(
+          'Saved history is temporarily unavailable; live chat will still connect. ' +
+          (e instanceof Error ? e.message : String(e)),
+        );
       }
-
+      if (!active) return;
       await copilotkit.connectAgent({ agent });
       if (active) setLoaded(true);
     })().catch((e) => {
@@ -247,10 +253,19 @@ replace(
         if (!merged.some((current) => current.id === message.id))
           merged.push(message);
 
-      await api(`/conversations/${thread.id}/messages`, 'PUT', {
-        messages: merged,
-      });
-      onSaved();""",
+      try {
+        await api(`/conversations/${thread.id}/messages`, 'PUT', {
+          messages: merged,
+        });
+        onSaved();
+      } catch (e) {
+        // Do not turn a successful assistant reply into a failed turn just
+        // because durable GitHub persistence failed.
+        setError(
+          'Message answered, but its encrypted history could not be saved: ' +
+          (e instanceof Error ? e.message : String(e)),
+        );
+      }""",
 )
 
 print("OpenDots patched for Metodbox ThreadHub + GitHub Agent PCs")
