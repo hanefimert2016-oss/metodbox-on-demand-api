@@ -210,14 +210,18 @@ export class Platform {
 
   async saveThreadMessages(
     threadId: string,
-    messages: StoredThreadMessage[],
+    messages: Record<string, unknown>[],
   ) {
     this.requireReady();
     const thread = this.workspace.requireThread(threadId);
+    const safeMessages = messages.filter(
+      (message): message is StoredThreadMessage =>
+        typeof message.role === 'string',
+    );
     return this.threadHub.putThreadMessages(threadId, {
       agentId: thread.dotId,
       title: thread.title,
-      messages,
+      messages: safeMessages,
     });
   }
 
