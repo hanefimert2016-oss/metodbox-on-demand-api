@@ -1,0 +1,81 @@
+name: Test Metodbox Openbox Desktop Engine
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-openbox-desktop.yml"
+      - "github-runtime/metodbox-desktop.ts"
+      - "github-runtime/patch-metodbox-desktop.py"
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact production desktop overlay without any real secrets
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/openbot-pc
+          git -C /tmp/openbot-pc checkout aff4981e0734f15ff2fc68c86a32f765e0cae2b2
+          python3 github-runtime/patch-metodbox-desktop.py /tmp/openbot-pc
+          docker build -t metodbox-gui-test -f /tmp/openbot-pc/agent-computer/Dockerfile /tmp/openbot-pc
+      - name: Boot Linux desktop and verify screenshot mouse and keyboard
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/metodbox-gui-test/workspace /tmp/metodbox-gui-test/profiles
+          sudo chown -R 0:0 /tmp/metodbox-gui-test
+          docker run -d --name metodbox-gui-test --cap-drop ALL \
+            --security-opt no-new-privileges:true --shm-size 1g \
+            -p 127.0.0.1:4100:4100 \
+            -e COMPUTER_TOKEN=test-only-no-secrets \
+            -e COMPUTER_BOT_ID=metodbox-test \
+            -e COMPUTER_BROWSER_MODE=headed \
+            -e EGRESS_POLICY_REQUIRED=0 \
+            -v /tmp/metodbox-gui-test/workspace:/workspace \
+            -v /tmp/metodbox-gui-test/profiles:/profiles \
+            metodbox-gui-test
+          for i in $(seq 1 55); do
+            if curl -fsS http://127.0.0.1:4100/health >/dev/null 2>&1; then break; fi
+            if [ "$(docker inspect --format '{{.State.Running}}' metodbox-gui-test)" != "true" ]; then
+              docker logs --tail 100 metodbox-gui-test
+              exit 1
+            fi
+            sleep 2
+          done
+          node --input-type=module <<'JS'
+          const root="http://127.0.0.1:4100";
+          const headers={Authorization:"Bearer test-only-no-secrets","x-openbot-bot-id":"metodbox-test","Content-Type":"application/json"};
+          async function pc(path,method="GET",data){
+            const r=await fetch(root+path,{method,headers,...(data?{body:JSON.stringify(data)}:{}),signal:AbortSignal.timeout(25000)});
+            const text=await r.text();
+            let d;
+            try{d=JSON.parse(text)}catch{throw Error(path+" non-JSON "+text.slice(0,150))}
+            if(!r.ok)throw Error(path+" HTTP "+r.status+": "+String(d.error).slice(0,200));
+            return d;
+          }
+          const info=await pc("/desktop/info");
+          if(info.mode!=="openbox"||info.width!==1280||info.height!==800)throw Error("Not a real headed Linux desktop");
+          const before=await pc("/desktop/screenshot");
+          if(before.surface!=="desktop"||before.base64?.length<800)throw Error("Missing X11 desktop PNG");
+          const click=await pc("/desktop/click","POST",{x:160,y:165,button:1});
+          const type=await pc("/desktop/type","POST",{text:"Metodbox Desktop Test 123"});
+          const key=await pc("/desktop/key","POST",{key:"Return"});
+          const scroll=await pc("/desktop/scroll","POST",{direction:"down",steps:2});
+          const after=await pc("/desktop/screenshot");
+          if(!click.ok||!type.ok||!key.ok||!scroll.ok||after.base64?.length<800)
+            throw Error("X11 input or screenshot failure");
+          console.log("Openbox desktop mouse, type, key, scroll, full screen screenshot: PASSED");
+          console.log("Screenshot PNG bytes:",Buffer.from(after.base64,"base64").length);
+          JS
+      - name: Preserve debugging logs if the test fails
+        if: failure()
+        run: docker logs --tail 100 metodbox-gui-test || true
+      - name: Stop disposable desktop
+        if: always()
+        run: docker rm -f metodbox-gui-test || true
