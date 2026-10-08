@@ -1,7 +1,7 @@
 import { verifySession } from "./portal.js";
 import { edgeSynthesize } from "./edge-tts.js";
 import { dotPage } from "./dot-ui.js";
-import { createThread, getThread, putThread, listThreads, readPcState, ensurePc, stopPc } from "./threadhub.js";
+import { createThread, getThread, putThread, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
 
 const AGENT_ID = "metodbox-dot";
 const DEFAULT_MODEL = "gpt-5.1";
@@ -140,6 +140,11 @@ export async function handleDotRequest(request,env,url,callModel) {
       const thread=await getThread(env,threadMatch[1]);
       if(!thread||thread.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
       return reply(thread);
+    }
+    if(threadMatch&&request.method==="DELETE"){
+      const thread=await getThread(env,threadMatch[1]);
+      if(!thread||thread.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
+      return reply({ok:await deleteThread(env,threadMatch[1])});
     }
     if(path==="message"&&request.method==="POST"){
       const data=await parseBody(request);
