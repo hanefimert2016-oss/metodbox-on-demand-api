@@ -96,35 +96,44 @@ export class Platform {
       channels.push(slack);
     }
 
-    const runtime = new CopilotRuntime({
-      ...(this.intelligence ? { intelligence: this.intelligence } : {}),
-      telemetryId: this.setupTelemetry.identity,
-      telemetryProperties: this.setupTelemetry.metadata,
-      identifyUser: async () => ({
-        id: workspace.ownerId,
-        name: 'OpenDots owner',
-      }),
-      agents: async () =>
-        Object.fromEntries(
-          workspace
-            .dots()
-            .map((dot) => [
+    const agents = async () =>
+      Object.fromEntries(
+        workspace
+          .dots()
+          .map((dot) => [
+            dot.id,
+            new DotAgent(
+              store,
+              workspace,
+              config,
               dot.id,
-              new DotAgent(
-                store,
-                workspace,
-                config,
-                dot.id,
-                false,
-                this.setupTelemetry,
-              ),
-            ]),
-        ),
-      channels,
-      // Thread naming belongs to ThreadHub in this deployment. Keeping the
-      // Intelligence naming hook off prevents a hidden cloud dependency.
-      generateThreadNames: false,
-    });
+              false,
+              this.setupTelemetry,
+            ),
+          ]),
+      );
+
+    // No Intelligence key => CopilotKit's plain SSE runtime. This is the key
+    // to making normal OpenDots chat independent from CopilotKit Intelligence.
+    // Thread durability is handled separately by ThreadHub.
+    const runtime = this.intelligence
+      ? new CopilotRuntime({
+          intelligence: this.intelligence,
+          telemetryId: this.setupTelemetry.identity,
+          telemetryProperties: this.setupTelemetry.metadata,
+          identifyUser: async () => ({
+            id: workspace.ownerId,
+            name: 'OpenDots owner',
+          }),
+          agents,
+          channels,
+          generateThreadNames: false,
+        })
+      : new CopilotRuntime({
+          telemetryId: this.setupTelemetry.identity,
+          telemetryProperties: this.setupTelemetry.metadata,
+          agents,
+        });
 
     this.handler = createCopilotHonoHandler({
       runtime,
