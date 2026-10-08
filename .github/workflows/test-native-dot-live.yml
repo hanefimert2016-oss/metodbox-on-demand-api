@@ -63,11 +63,28 @@ jobs:
             if(!stored.messages?.some(m=>m.role==="assistant"&&m.content===result.content))
               throw Error("Encrypted history round-trip failed");
             console.log("Live Dot model answer and encrypted thread roundtrip: OK, length:",result.content.length);
-            const pc=await api("pc/status");
+            const pairs=await Promise.all([
+              api("message","POST",{threadId:id,text:"Yalnızca bir kelime yaz: kırmızı. Bilgisayar kullanma."}),
+              api("message","POST",{threadId:id,text:"Yalnızca bir kelime yaz: mavi. Bilgisayar kullanma."})
+            ]);
+            if(pairs.some(p=>p.saved!==true||!p.content?.trim()))throw Error("Concurrent reply failed");
+            const both=await api("threads/"+id);
+            if(both.messages.length!==6)throw Error("Two model requests overwrote chat history: "+both.messages.length+" messages found");
+            for(const text of pairs.map(p=>p.content)){
+              if(!both.messages.some(m=>m.role==="assistant"&&m.content===text))
+                throw Error("Concurrent assistant result missing from GitHub history");
+            }
+            console.log("Two simultaneous real GPT+ messages preserved: OK.");
+            const pc=await api("pc/status?chatId="+encodeURIComponent(id));
             if(typeof pc.status!=="string")throw Error("PC state endpoint missing");
             console.log("PC status endpoint: OK, status:",pc.status);
           }finally{
-            if(id){try{await api("threads/"+id,"DELETE");console.log("Test conversation removed.")}catch(e){console.error("Cleanup failed:",e.message)}}
+            if(id){
+              try{await api("pc/stop","POST",{chatId:id,agentId:"main"});console.log("Test PC shutdown requested.")}
+              catch(e){console.log("PC cleanup warning:",e.message)}
+              try{await api("threads/"+id,"DELETE");console.log("Test conversation removed.")}
+              catch(e){console.error("Cleanup failed:",e.message)}
+            }
           }
           try{
             const edge=await fetch(base+"/dot/api/tts",{
