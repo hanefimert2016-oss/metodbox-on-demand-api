@@ -9,41 +9,60 @@ permissions:
 jobs:
   setup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
-      - name: Checkout the existing Cloudflare Worker
+      - name: Checkout canonical Metodbox Worker
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Validate private data repo and credentials
+      - name: Validate single GitHub token and PRIVATE storage repo
         env:
           GH_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
         run: |
           set -euo pipefail
-          : "${GH_TOKEN:?AGENT_STORAGE_TOKEN secret eksik}"
-          visibility="$(gh api repos/hanefimert2016-oss/ai-application-suite-1 --jq '.private')"
+          : "${GH_TOKEN:?One GitHub PAT (AGENT_STORAGE_TOKEN) is missing}"
+          for repo in hanefimert2016-oss/Metodbox-secret-system hanefimert2016-oss/metodbox-on-demand-api; do
+            gh api "repos/$repo" --jq .full_name
+          done
+          visibility="$(gh api repos/hanefimert2016-oss/Metodbox-secret-system --jq '.private')"
           if [ "$visibility" != "true" ]; then
-            echo "::error::Persistent data repo must be PRIVATE"
+            echo "::error::Metodbox-secret-system is PUBLIC; make it PRIVATE before proceeding."
             exit 1
           fi
-          gh api repos/hanefimert2016-oss/ai-application-suite-1/branches/agent-data --jq .name
-      - name: Setup Wrangler
+          gh api repos/hanefimert2016-oss/Metodbox-secret-system/branches/agent-data --jq .name
+      - name: Install Wrangler
         run: npm install --no-audit --no-fund
-      - name: Set private storage and dispatch Worker secrets
+      - name: Configure secrets on existing Cloudflare Worker (NO ngrok)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          AGENT_STORAGE_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
-          AGENT_DISPATCH_TOKEN: ${{ secrets.AGENT_DISPATCH_TOKEN }}
+          ONE_GITHUB_PAT: ${{ secrets.AGENT_STORAGE_TOKEN }}
+          PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+          PORTAL_SESSION_SECRET: ${{ secrets.PORTAL_SESSION_SECRET }}
+          STORAGE_ENCRYPTION_KEY: ${{ secrets.STORAGE_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
-          : "${CLOUDFLARE_API_TOKEN:?Cloudflare token missing}"
-          : "${CLOUDFLARE_ACCOUNT_ID:?Cloudflare account ID missing}"
-          : "${AGENT_STORAGE_TOKEN:?AGENT_STORAGE_TOKEN missing}"
-          : "${AGENT_DISPATCH_TOKEN:?AGENT_DISPATCH_TOKEN missing}"
-          printf '%s' "$AGENT_STORAGE_TOKEN" | npx wrangler secret put GITHUB_STORAGE_TOKEN
-          printf '%s' 'hanefimert2016-oss/ai-application-suite-1' | npx wrangler secret put GITHUB_STORAGE_REPO
+          : "${CLOUDFLARE_API_TOKEN:?Existing Cloudflare API token missing}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Existing Cloudflare account ID missing}"
+          : "${ONE_GITHUB_PAT:?Single GitHub PAT missing}"
+          : "${PORTAL_PASSWORD:?Portal password secret missing}"
+          : "${PORTAL_SESSION_SECRET:?Portal signing key secret missing}"
+          : "${STORAGE_ENCRYPTION_KEY:?Data encryption key secret missing}"
+          printf '%s' "$ONE_GITHUB_PAT" | npx wrangler secret put GITHUB_STORAGE_TOKEN
+          printf '%s' "$ONE_GITHUB_PAT" | npx wrangler secret put GITHUB_TRIGGER_TOKEN
+          printf '%s' 'hanefimert2016-oss/Metodbox-secret-system' | npx wrangler secret put GITHUB_STORAGE_REPO
           printf '%s' 'agent-data' | npx wrangler secret put GITHUB_STORAGE_BRANCH
           printf '%s' 'hanefimert2016-oss/metodbox-on-demand-api' | npx wrangler secret put GITHUB_LAUNCH_REPO
-          printf '%s' "$AGENT_DISPATCH_TOKEN" | npx wrangler secret put GITHUB_TRIGGER_TOKEN
-          echo "Private encrypted ThreadHub storage configured; existing Worker routes preserved." >> "$GITHUB_STEP_SUMMARY"
+          printf '%s' 'admin' | npx wrangler secret put PORTAL_USERNAME
+          printf '%s' "$PORTAL_PASSWORD" | npx wrangler secret put PORTAL_PASSWORD
+          printf '%s' "$PORTAL_SESSION_SECRET" | npx wrangler secret put PORTAL_SESSION_SECRET
+          printf '%s' "$STORAGE_ENCRYPTION_KEY" | npx wrangler secret put STORAGE_ENCRYPTION_KEY
+          npx wrangler deploy
+          {
+            echo "## Metodbox Cloudflare private storage configured"
+            echo
+            echo "Main code: hanefimert2016-oss/metodbox-on-demand-api"
+            echo "Encrypted storage: hanefimert2016-oss/Metodbox-secret-system @ agent-data"
+            echo "Portal: https://metodbox-direct-api.hanefimert2016.workers.dev/apps"
+            echo "ngrok: not used"
+          } >> "$GITHUB_STEP_SUMMARY"
