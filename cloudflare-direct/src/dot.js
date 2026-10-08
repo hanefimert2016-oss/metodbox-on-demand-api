@@ -3,7 +3,7 @@ import { edgeSynthesize } from "./edge-tts.js";
 import { dotPage } from "./dot-ui.js";
 import { teamPage } from "./dot-team-ui.js";
 import { mainPcId, rosterFor, getAuthorizedAgent, createAgents, runAgentsInParallel, updateAgentReports, MAX_AGENTS } from "./dot-agents.js";
-import { getRoster, saveRoster } from "./threadhub.js";
+import { getRoster, updateRoster } from "./threadhub.js";
 import { createThread, getThread, putThread, listThreads, deleteThread, readPcState, ensurePc, stopPc } from "./threadhub.js";
 
 const AGENT_ID = "metodbox-dot";
@@ -215,8 +215,7 @@ export async function handleDotRequest(request,env,url,callModel) {
         if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"Terminal izni için önce 12+ karakterli güçlü portal şifresi belirle."},403);
         const input=await parseBody(request);
         if(typeof input.allowExec!=="boolean")return reply({error:"İzin değeri gerekli"},400);
-        const old=await getRoster(env,id);
-        return reply(await saveRoster(env,id,{...old,allowExec:input.allowExec}));
+        return reply(await updateRoster(env,id,current=>({...current,allowExec:input.allowExec})));
       }
       if(action==="list"&&request.method==="POST"){
         const input=await parseBody(request,10000);
