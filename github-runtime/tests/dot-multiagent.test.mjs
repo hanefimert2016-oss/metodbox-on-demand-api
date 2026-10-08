@@ -151,7 +151,7 @@ test("stale PC tunnel can be restarted and receives a fresh dispatch",async()=>{
     assert.equal(made.response.status,201);
     const pcid="ch-"+made.data.id;
     await env.AUTH_KV.put("agent_pc:"+pcid,JSON.stringify({
-      agentId:pcid,status:"running",url:"https://old.trycloudflare.com",
+      agentId:pcid,status:"running",heartbeat:true,url:"https://old.trycloudflare.com",
       updated_at:Date.now()-20*60*1000
     }));
     const status=await invoke(env,cookie,"GET","/dot/api/pc/status?chatId="+made.data.id);
@@ -162,6 +162,14 @@ test("stale PC tunnel can be restarted and receives a fresh dispatch",async()=>{
     const current=stub.calls.filter(c=>c.url.endsWith("/dispatches"));
     assert.equal(current.length,previous+1);
     assert.equal(JSON.parse(current.at(-1).body).client_payload.agent_id,pcid);
+    // Existing runners launched before the heartbeat patch must not suddenly
+    // be marked stale after 10 minutes while they are still actually running.
+    await env.AUTH_KV.put("agent_pc:"+pcid,JSON.stringify({
+      agentId:pcid,status:"running",url:"https://legacy.trycloudflare.com",
+      updated_at:Date.now()-20*60*1000
+    }));
+    const legacy=await invoke(env,cookie,"GET","/dot/api/pc/status?chatId="+made.data.id);
+    assert.equal(legacy.data.status,"running");
   }finally{globalThis.fetch=old}
 });
 
