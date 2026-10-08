@@ -193,6 +193,7 @@ export async function handlePortalRequest(request, env, url) {
     const form = await request.formData();
     const username = String(form.get("username") || "");
     const password = String(form.get("password") || "");
+    const returnTo = String(form.get("return_to") || "") === "/dot" ? "/dot" : "/apps";
     const expectedUser = env.PORTAL_USERNAME || "admin";
     const validUser = await matchingSecret(username, expectedUser);
     const validPassword = await matchingSecret(password, env.PORTAL_PASSWORD);
@@ -205,7 +206,7 @@ export async function handlePortalRequest(request, env, url) {
     return new Response(null, {
       status: 303,
       headers: {
-        Location: "/apps",
+        Location: returnTo,
         "Set-Cookie": `mb_portal=${token}; Path=/; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
       },
     });
