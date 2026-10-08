@@ -575,7 +575,7 @@ export async function readPcState(env, agentId) {
     // A GitHub Actions runner sends a new heartbeat every 3 minutes. Never
     // treat an expired tunnel URL as a live PC after abrupt runner termination.
     const stale = (
-      (state.status==="running" && age>10*60*1000) ||
+      (state.status==="running" && age>(state.heartbeat===true?10*60*1000:350*60*1000)) ||
       (state.status==="requested" && age>15*60*1000) ||
       (state.status==="starting" && age>25*60*1000) ||
       (state.status==="stopping" && age>15*60*1000)
