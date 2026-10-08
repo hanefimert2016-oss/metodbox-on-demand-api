@@ -21,11 +21,15 @@ export async function edgeSynthesize(input, requestedVoice="tr-TR-EmelNeural"){
   const id=crypto.randomUUID().replace(/-/g,"");
   const url="https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1"+
     "?TrustedClientToken="+TOKEN+"&Sec-MS-GEC="+await msGec()+
-    "&Sec-MS-GEC-Version=1-130.0.2849.68&ConnectionId="+id;
+    "&Sec-MS-GEC-Version=1-143.0.3650.75&ConnectionId="+id;
   const result=await fetch(url,{headers:{
     Upgrade:"websocket",
     Origin:"chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
-    "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+    Cookie:"muid="+crypto.randomUUID().replace(/-/g,"").toUpperCase()+";",
+    "Cache-Control":"no-cache",
+    Pragma:"no-cache",
+    "Accept-Language":"tr-TR,tr;q=0.9,en-US;q=0.8",
+    "User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",
   }});
   if(result.status!==101||!result.webSocket)throw Error("Edge TTS handshake HTTP "+result.status);
   const ws=result.webSocket;
