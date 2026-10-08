@@ -5,6 +5,10 @@ const THREAD_INDEX = THREAD_ROOT + "/index.enc.json";
 const MAX_THREAD_BYTES = 4 * 1024 * 1024;
 const MAX_MESSAGES = 2000;
 const PC_PREFIX = "agent_pc:";
+const ROSTER_ROOT = "agent-storage/rosters";
+const ROSTER_MAX_AGENTS = 6;
+function rosterPath(chatId) { return ROSTER_ROOT + "/" + safeId(chatId,"chat id") + ".enc.json"; }
+
 const PC_STOP_PREFIX = "agent_pc_stop:";
 
 function bytesToBase64(bytes) {
@@ -420,6 +424,44 @@ export async function listThreads(env, agentId) {
   return value.threads
     .filter((thread) => !id || thread.agentId === id)
     .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+}
+
+// Roster files live ONLY in the private storage branch, AES-256-GCM encrypted.
+// One main PC exists per chat; each child agent gets its own encrypted PC archive.
+export async function getRoster(env, chatId) {
+  const id = safeId(chatId,"chat id");
+  const { value } = await readEncrypted(env,rosterPath(id),null);
+  return value || {chatId:id,mainPcId:"ch-"+id,agents:[],createdAt:Date.now(),updatedAt:Date.now()};
+}
+
+export async function saveRoster(env,chatId,roster) {
+  const id = safeId(chatId,"chat id");
+  if(!roster||!Array.isArray(roster.agents)||roster.agents.length>ROSTER_MAX_AGENTS) {
+    throw new Error("Agent roster exceeds safe limit");
+  }
+  const clean = {
+    chatId:id,mainPcId:"ch-"+id,
+    agents:roster.agents.map(x=>({
+      id:safeId(x.id,"child id"),name:String(x.name||"Agent").slice(0,80),
+      task:String(x.task||"").slice(0,2000),status:String(x.status||"idle").slice(0,32),
+      report:String(x.report||"").slice(0,8000),createdAt:Number(x.createdAt)||Date.now(),
+      updatedAt:Number(x.updatedAt)||Date.now()
+    })),
+    createdAt:Number(roster.createdAt)||Date.now(),updatedAt:Date.now()
+  };
+  let last;
+  for(let i=0;i<5;i++){
+    const prev=await readEncrypted(env,rosterPath(id),null);
+    try {
+      await writeEncrypted(env,rosterPath(id),clean,prev.sha,"agents: "+id+" roster");
+      return clean;
+    }catch(error){
+      last=error;
+      if(error?.status!==409&&error?.status!==422)throw error;
+      await new Promise(r=>setTimeout(r,80+i*100));
+    }
+  }
+  throw last||new Error("Agent list could not be persisted");
 }
 
 export async function deleteThread(env, id) {
