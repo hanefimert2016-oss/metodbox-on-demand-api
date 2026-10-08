@@ -19,6 +19,40 @@ Mevcut Cloudflare kimlik bilgilerini yeniden oluşturmaz. İşlem sonunda
 oradan başlatılır. ngrok kurulumu gerekmez. Ayrıntılar:
 [AGENT_THREADS_INTEGRATION.md](AGENT_THREADS_INTEGRATION.md).
 
+## Dot PC, mesajlaşma ve telefondan sesli görüşme (8 Ekim 2026)
+
+- Dot PC hatası (exit 7): Docker `--cap-drop ALL` altında host'a bağlı
+  `/workspace` ve `/profiles` dizinleri `EACCES` veriyordu.
+  Başlatmadan önce yalnızca bu iki klasörün sahipliği container UID 0'a,
+  durdurma sonrası host runner'a devredilir. **Docker güvenlik bayrakları kaldırılmadı.**
+- Sohbet cevapları: gerçek Worker GPT+ API'si ve ThreadHub create/read/delete
+  ile araçlı SSE iletişimi canlı GitHub Actions testlerinden geçirildi.
+  OpenDots, GitHub geçmişini okumada geçici hata olduğunda canlı chat
+  bağlantısını bloke etmemeye ve kaydetme başarısızlığını kullanıcıya
+  ayrı bildirmeye güncellendi.
+- Sesli görüşme: Orijinal OpenDots WebRTC arama butonu mevcuttur; yeni
+  oturumlarda ayrı `VOICE_API_KEY` Actions Secret'ı varsa etkinleşir.
+  Ses OpenAI'ın Realtime API'sine gönderilir, GPT+ model API'si ses
+  sağlayıcısı değildir. **OpenAI Realtime API'nin ayrı erişim/ücretlendirmesi olabilir.**
+  Bu özellik normal GSM/telefon numarası araması değildir.
+
+### Termux'tan isteğe bağlı sesli görüşmeyi etkinleştirme
+
+Önce kendi OpenAI API projen için Realtime erişimi olan API anahtarını
+[OpenAI API Keys](https://platform.openai.com/api-keys) sayfasında oluştur.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hanefimert2016-oss/metodbox-on-demand-api/main/github-runtime/configure-voice-termux.sh -o ~/configure-voice.sh
+bash ~/configure-voice.sh
+```
+
+Anahtar GitHub Actions Secrets'a gizli biçimde kaydedilir; repo veya chat'te
+paylaşılmaz. OpenDots'u durdurup yeni bir oturum başlattıktan sonra Dot chat
+ekranındaki telefon simgesi etkinleşir. Tarayıcıdan mikrofon izni vermelisin.
+
+Model gateway ve PC teşhislerini manuel tekrar çalıştırmak için:
+[Diagnose Metodbox Model and Agent PC](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/diagnose-metodbox-runtime.yml).
+
 ## Aktif sistem — Cloudflare Worker (ngrok GEREKMİYOR)
 
 - **Ana kod deposu:** [metodbox-on-demand-api](https://github.com/hanefimert2016-oss/metodbox-on-demand-api) (değişmedi)
