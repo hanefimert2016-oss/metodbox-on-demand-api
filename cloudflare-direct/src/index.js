@@ -1,5 +1,6 @@
 import { handleThreadHubRequest } from "./threadhub.js";
 import { handlePortalRequest } from "./portal.js";
+import { handleDotRequest } from "./dot.js";
 import puppeteer from "@cloudflare/puppeteer";
 
 const GPTPLUS = "https://gptplus.metodbox.ai";
@@ -907,6 +908,17 @@ export default {
 
     const threadHubResponse = await handleThreadHubRequest(request, env, url);
     if (threadHubResponse) return threadHubResponse;
+
+    // Native Dot is served by this Worker; no GitHub app runner needed.
+    const dotResponse = await handleDotRequest(request, env, url, async body => {
+      const upstream = await callGptPlus(env, sanitizeToolFields({...body, stream: false}));
+      if (!upstream.ok) {
+        throw new Error("Metodbox model HTTP " + upstream.status + ": " + (await upstream.text()).slice(0,250));
+      }
+      const data = await upstream.json();
+      return sanitizeChatToolCalls(data, body);
+    });
+    if (dotResponse) return dotResponse;
 
     const portalResponse = await handlePortalRequest(request, env, url);
     if (portalResponse) return portalResponse;
