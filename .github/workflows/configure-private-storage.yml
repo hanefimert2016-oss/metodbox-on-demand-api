@@ -30,6 +30,26 @@ jobs:
             exit 1
           fi
           gh api repos/hanefimert2016-oss/Metodbox-secret-system/branches/agent-data --jq .name
+      - name: Verify required Secrets before deployment
+        env:
+          HAS_PORTAL_SESSION_SECRET: ${{ secrets.PORTAL_SESSION_SECRET != '' }}
+          HAS_STORAGE_ENCRYPTION_KEY: ${{ secrets.STORAGE_ENCRYPTION_KEY != '' }}
+          HAS_PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for pair in "PORTAL_SESSION_SECRET:$HAS_PORTAL_SESSION_SECRET" "STORAGE_ENCRYPTION_KEY:$HAS_STORAGE_ENCRYPTION_KEY" "PORTAL_PASSWORD:$HAS_PORTAL_PASSWORD"; do
+            key="${pair%%:*}"
+            present="${pair#*:}"
+            if [ "$present" != "true" ]; then
+              echo "::error title=Missing GitHub Actions Secret::$key is missing in the MAIN repo. From Termux run: pkg install -y openssl-tool gh; curl -fsSL https://raw.githubusercontent.com/hanefimert2016-oss/metodbox-on-demand-api/main/github-runtime/fix-secrets-termux.sh -o ~/fix-secrets.sh; bash ~/fix-secrets.sh"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "First add the missing Actions Secrets, then run Configure Private Thread Storage again."
+            exit 1
+          fi
       - name: Install Wrangler
         run: npm install --no-audit --no-fund
       - name: Configure secrets on existing Cloudflare Worker (NO ngrok)
