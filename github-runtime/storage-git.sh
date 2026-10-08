@@ -7,7 +7,7 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
 fi
 
 storage_configure() {
-  : "${AGENT_STORAGE_REPO:=hanefimert2016-oss/ai-application-suite-1}"
+  : "${AGENT_STORAGE_REPO:=hanefimert2016-oss/Metodbox-secret-system}"
   : "${AGENT_STORAGE_BRANCH:=agent-data}"
   if [[ -z "${AGENT_STORAGE_TOKEN:-}" ]]; then
     echo "::error::AGENT_STORAGE_TOKEN GitHub Actions secret eksik." >&2
@@ -20,6 +20,14 @@ storage_configure() {
   fi
   if [[ "$AGENT_STORAGE_REPO" == "${GITHUB_REPOSITORY:-hanefimert2016-oss/metodbox-on-demand-api}" ]]; then
     echo "Refusing to use the PUBLIC control repository for persistent data." >&2
+    return 1
+  fi
+  # Fail closed: never upload private agent data to a public repository.
+  # Uses the already-provided one fine-grained PAT, without logging it.
+  local is_private
+  is_private="$(GH_TOKEN="$AGENT_STORAGE_TOKEN" gh api "repos/$AGENT_STORAGE_REPO" --jq '.private')" || return 1
+  if [[ "$is_private" != "true" ]]; then
+    echo "::error::Storage repo is PUBLIC. Set repository visibility to Private before starting agents." >&2
     return 1
   fi
   export GIT_TERMINAL_PROMPT=0
