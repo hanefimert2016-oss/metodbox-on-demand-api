@@ -29,7 +29,7 @@ fi
 # A secret may have been created with an empty string, even if its name exists.
 if [[ "${1:-}" == "--reset-session" ]]; then
   echo "PORTAL_SESSION_SECRET yeniden üretilecek (varsa eski oturumları kapatır)."
-  openssl rand -hex 32 | tr -d '\\n' | gh secret set PORTAL_SESSION_SECRET --repo "$REPO" --app actions
+  openssl rand -hex 32 | tr -d '\n' | gh secret set PORTAL_SESSION_SECRET --repo "$REPO" --app actions
   echo "✔ PORTAL_SESSION_SECRET rastgele bir değerle yeniden ayarlandı."
   echo
 elif [[ -n "${1:-}" ]]; then
