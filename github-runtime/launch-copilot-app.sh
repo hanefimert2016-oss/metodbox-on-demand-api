@@ -14,6 +14,7 @@ PUBLIC_URL=""
 DATA_WORKTREE="/tmp/metodbox-app-data"
 OPENDOTS_STATE="$DATA_WORKTREE/agent-storage/apps/opendots/state.tar.gz.enc"
 OPENDOTS_COMMIT="625452e06cde74cb25b0ce319e2c1be0488f5a5f"
+source "$(dirname "${BASH_SOURCE[0]}")/storage-git.sh"
 
 if [[ "$APP" != "openbot" && "$APP" != "opendots" ]]; then
   echo "Unsupported app: $APP" >&2
@@ -50,9 +51,7 @@ set_status() {
 }
 
 prepare_data_branch() {
-  rm -rf "$DATA_WORKTREE"
-  git fetch origin agent-data:refs/remotes/origin/agent-data
-  git worktree add -B agent-data "$DATA_WORKTREE" origin/agent-data
+  storage_clone "$DATA_WORKTREE"
 }
 
 restore_opendots_state() {
@@ -98,20 +97,12 @@ persist_opendots_state() {
   git -C "$DATA_WORKTREE" config user.email "actions@users.noreply.github.com"
   git -C "$DATA_WORKTREE" commit -m "storage: save encrypted OpenDots state"
 
-  for attempt in 1 2 3 4; do
-    git -C "$DATA_WORKTREE" pull --rebase origin agent-data || {
-      git -C "$DATA_WORKTREE" rebase --abort >/dev/null 2>&1 || true
-      sleep "$((attempt * 2))"
-      continue
-    }
-    if git -C "$DATA_WORKTREE" push origin HEAD:agent-data; then
-      echo "Encrypted OpenDots application state persisted."
-      return 0
-    fi
-    sleep "$((attempt * 2))"
-  done
-
-  echo "WARNING: OpenDots state could not be pushed after retries." >&2
+  if storage_push "$DATA_WORKTREE"; then
+    echo "Encrypted OpenDots application state persisted privately."
+  else
+    echo "WARNING: OpenDots private state persistence FAILED." >&2
+    return 1
+  fi
   return 0
 }
 
