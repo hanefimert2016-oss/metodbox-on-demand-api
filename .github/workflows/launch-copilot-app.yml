@@ -27,7 +27,7 @@ jobs:
     env:
       APP: ${{ github.event.client_payload.app || inputs.app }}
       AGENT_STORAGE_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
-      AGENT_STORAGE_REPO: hanefimert2016-oss/ai-application-suite-1
+      AGENT_STORAGE_REPO: hanefimert2016-oss/Metodbox-secret-system
       AGENT_STORAGE_BRANCH: agent-data
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
