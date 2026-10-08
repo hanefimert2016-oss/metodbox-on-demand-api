@@ -1,5 +1,23 @@
 # Metodbox On-Demand API
 
+## Aktif sistem — Cloudflare Worker (ngrok GEREKMİYOR)
+
+- **Ana kod deposu:** [metodbox-on-demand-api](https://github.com/hanefimert2016-oss/metodbox-on-demand-api) (değişmedi)
+- **Şifreli veri deposu:** [Metodbox-secret-system](https://github.com/hanefimert2016-oss/Metodbox-secret-system), `agent-data` dalı
+- **Önemli:** Veri deposu başlangıçta public oluşturuldu; **önce PRIVATE yap**, yoksa servis veri saklamayı reddeder.
+- **Giriş adresi:** https://metodbox-direct-api.hanefimert2016.workers.dev/apps
+- **Kullanıcı adı:** `admin`; ilk şifreyi yerel kurulumda `2026` olarak gir
+- **API base URL:** https://metodbox-direct-api.hanefimert2016.workers.dev/v1
+- **Yeni gereken GitHub token:** Bir adet; iki depoya Contents Read/Write izni verilir
+- **Kurulum:** [tek-token ve Cloudflare rehberi](AGENT_THREADS_INTEGRATION.md)
+
+OpenDots ThreadHub ve bağımsız agent bilgisayarları mevcut Cloudflare Worker ile çalışacak.
+Her agent PC kendi geçici GitHub Actions runner'ında başlar ve şifreli checkpoint dosyalarını
+`Metodbox-secret-system` deposuna kaydeder. Worker sürekli bir endpoint sunabilir; GitHub runner
+sürekli açık PC değildir. GitHub ve Cloudflare kotaları geçerlidir.
+
+## Eski yöntem: ngrok üzerinden geçici API (isteğe bağlı, artık gerekli değil)
+
 API **GitHub Actions runner üzerinde** çalışır. PC'de veya Cloudflare'da sürekli açık servis yoktur.
 
 ## Sabit URL
