@@ -29,6 +29,7 @@ header{display:flex;justify-content:space-between;align-items:center;padding:15p
 (()=>{'use strict';
 const $=x=>document.getElementById(x);const chatId=new URL(location.href).searchParams.get('chatId');
 let selected='main',roster=null,loading=false;
+if(chatId){const link=document.querySelector('header a');if(link)link.href='/dot?chatId='+encodeURIComponent(chatId)}
 async function api(path,method='GET',body){const r=await fetch('/dot/api/'+path,{method,headers:{'Content-Type':'application/json'},credentials:'same-origin',cache:'no-store',body:body?JSON.stringify(body):undefined});const o=await r.json().catch(()=>({}));if(!r.ok)throw Error(o.error||'HTTP '+r.status);return o}
 function status(t){$('topStatus').textContent=t}
 function output(t){$('output').textContent=typeof t==='string'?t:JSON.stringify(t,null,2)}
