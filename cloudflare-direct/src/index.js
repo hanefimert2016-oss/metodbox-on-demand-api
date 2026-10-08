@@ -1,3 +1,4 @@
+import { handleThreadHubRequest } from "./threadhub.js";
 import { handlePortalRequest } from "./portal.js";
 import puppeteer from "@cloudflare/puppeteer";
 
@@ -904,6 +905,9 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
+    const threadHubResponse = await handleThreadHubRequest(request, env, url);
+    if (threadHubResponse) return threadHubResponse;
+
     const portalResponse = await handlePortalRequest(request, env, url);
     if (portalResponse) return portalResponse;
 
@@ -916,7 +920,7 @@ export default {
         service: "metodbox-direct-worker",
         models: MODELS,
         mode: "cloudflare-browser-run",
-        build: "apps-portal-v1",
+        build: "threadhub-agentpc-v1",
       });
     }
 
