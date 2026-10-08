@@ -20,10 +20,10 @@ header{padding:12px 18px;border-bottom:1px solid var(--edge);display:flex;justif
 <main><header><div class="actions"><button id="mobileMenu">☰</button><span class="brand">✦ Dot</span><span class="note" id="status">Hazır</span></div><div class="actions"><button id="voiceButton" class="primary">☎ Ara</button><button id="pcButton">▣ PC</button></div></header>
 <div id="messages"><div class="bubble"><span class="who">Dot</span>Merhaba! Ben Metodbox Dot. Mesaj yazabilir, ☎ Ara ile konuşabilir veya PC'yi açabilirsin.</div></div><div id="composer"><textarea id="input" placeholder="Dot'a mesaj gönder…" rows="1"></textarea><button id="sendButton" class="primary">➤</button></div></main></div>
 <div id="pcPanel"><div class="actions" style="justify-content:space-between"><strong>Dot'un bulut bilgisayarı</strong><button id="pcClose">✕</button></div><p class="note" id="pcStatus">Henüz başlatılmadı.</p><div class="actions"><button id="pcStart" class="primary">PC Başlat</button><button id="pcStop">Durdur</button><button id="pcRefresh">Yenile</button></div><h3>Tarayıcı</h3><input id="pcUrl" value="https://example.org" placeholder="https://"><button id="pcNavigate">Web sitesini aç</button> <button id="pcScreenshot">Ekran görüntüsü</button><img id="pcShot" alt="PC tarayıcı görüntüsü"><h3>Terminal</h3><input id="pcCommand" placeholder="örn. pwd"><button id="pcExec">Komutu çalıştır</button><p class="note">Terminal komutunu onayladıktan sonra izole GitHub PC'de çalıştırır.</p><pre id="pcOutput"></pre></div>
-<div id="call"><div class="note">METODBOX · SESLİ GÖRÜŞME</div><div id="callOrb">✦</div><h2>Dot ile konuş</h2><div id="callStatus" class="note">Mikrofon hazırlanıyor…</div><div id="callCaption">Seni dinliyorum.</div><div class="callbuttons"><button id="callMute">🎙 Mikrofonu kapat</button><button id="callEnd" style="background:#9e293a">☎ Görüşmeyi bitir</button></div><p class="note">Normal telefon hattı değil · Neural ses için konuşma metni Microsoft'a iletilebilir; servis kapalıysa cihaz sesi kullanılır.</p></div>
+<div id="call"><div class="note">METODBOX · SESLİ GÖRÜŞME</div><div id="callOrb">✦</div><h2>Dot ile konuş</h2><label class="note">Ses <select id="voiceSelect" style="background:#1b2b42;color:white;padding:8px;border-radius:10px"><option value="tr-TR-EmelNeural">Emel · Neural</option><option value="tr-TR-AhmetNeural">Ahmet · Neural</option><option value="device">Telefonun Türkçe sesi</option></select></label><div id="callStatus" class="note">Mikrofon hazırlanıyor…</div><div id="callCaption">Seni dinliyorum.</div><div class="callbuttons"><button id="callMute">🎙 Mikrofonu kapat</button><button id="callEnd" style="background:#9e293a">☎ Görüşmeyi bitir</button></div><p class="note">Normal telefon hattı değil · Neural ses için konuşma metni Microsoft'a iletilebilir; servis kapalıysa cihaz sesi kullanılır.</p></div>
 <script>
 (()=>{'use strict';
-const $=id=>document.getElementById(id);const state={thread:null,threads:[],busy:false,calling:false,muted:false,speaking:false,recognizer:null,listening:false};
+const $=id=>document.getElementById(id);const state={thread:null,threads:[],busy:false,calling:false,muted:false,speaking:false,recognizer:null,listening:false,edgeUnavailable:false,audio:null};
 async function send(path,method='GET',body){const r=await fetch('/dot/api/'+path,{method,headers:{'Content-Type':'application/json'},credentials:'same-origin',body:body?JSON.stringify(body):undefined,cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'HTTP '+r.status);return d}
 function setStatus(t){$('status').textContent=t}
 function bubble(role,text){const node=document.createElement('div');node.className='bubble '+(role==='user'?'user':'');const who=document.createElement('span');who.className='who';who.textContent=role==='user'?'Sen':'Dot';node.append(who,document.createTextNode(String(text)));$('messages').append(node);$('messages').scrollTop=$('messages').scrollHeight}
@@ -41,13 +41,18 @@ async function speak(text){
   if(!state.calling)return;
   state.speaking=true;
   const input=String(text).replace(/[\*_#]/g,'').slice(0,850);
+  if($('voiceSelect').value==='device'||state.edgeUnavailable){
+    $('callStatus').textContent='Telefonun Türkçe sesi kullanılıyor.';
+    try{await deviceSpeak(input)}finally{state.speaking=false}
+    return;
+  }
   // Prefer remote neural voice; download audio bytes only (no large model/RAM).
   // The unofficial Edge endpoint can fail. Always offer native device TTS.
   try{
     $('callStatus').textContent='Neural ses hazırlanıyor…';
     const response=await fetch('/dot/api/tts',{method:'POST',credentials:'same-origin',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:input,voice:'tr-TR-EmelNeural'}),
+      body:JSON.stringify({text:input,voice:$('voiceSelect').value}),
       signal:AbortSignal.timeout(17000)});
     if(!response.ok)throw Error('Neural TTS HTTP '+response.status);
     const blob=await response.blob();
@@ -61,8 +66,9 @@ async function speak(text){
       return;
     }finally{state.audio=null;URL.revokeObjectURL(url)}
   }catch(error){
+    state.edgeUnavailable=true;
     if(!state.calling)return;
-    $('callStatus').textContent='Telefonun Türkçe sesi kullanılıyor.';
+    $('callStatus').textContent='Neural ses şu anda erişilemiyor; telefon sesi kullanılıyor.';
     await deviceSpeak(input);
   }finally{state.speaking=false}
 }
