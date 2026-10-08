@@ -180,6 +180,9 @@ set_state "starting" "OpenBot agent-computer imajı hazırlanıyor."
 rm -rf /tmp/openbot-agent-source
 git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/openbot-agent-source
 git -C /tmp/openbot-agent-source checkout "$UPSTREAM_COMMIT"
+# Add our own tiny Linux desktop and authenticated desktop I/O endpoints.
+# The original OpenBot computer still handles browser, terminal and storage.
+python3 "$PWD/github-runtime/patch-metodbox-desktop.py" /tmp/openbot-agent-source
 
 docker build   -f /tmp/openbot-agent-source/agent-computer/Dockerfile   -t "metodbox-agent-computer:$UPSTREAM_COMMIT"   /tmp/openbot-agent-source
 
@@ -192,7 +195,7 @@ set_state "starting" "Ajan için izole Chromium, terminal ve workspace başlatı
 # Never globally chmod 777: browser profiles may hold login credentials.
 sudo chown -R 0:0 "$WORKSPACE" "$PROFILES"
 sudo chmod u+rwx "$WORKSPACE" "$PROFILES"
-docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
+docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BROWSER_MODE=headed   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
 
 for _ in $(seq 1 120); do
   if curl -fsS --max-time 3 http://127.0.0.1:4100/health >/dev/null 2>&1; then
