@@ -1,4 +1,4 @@
-export type StoredThreadMessage = Record<string, unknown>;
+export type StoredThreadMessage = { role: string; content?: unknown; [key: string]: unknown };
 
 export interface StoredThread {
   id: string;
