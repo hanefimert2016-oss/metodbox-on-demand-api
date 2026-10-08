@@ -1,5 +1,17 @@
 # Metodbox Dot — Kendi Hafif AI Asistanımız
 
+### Son güvenilirlik geliştirmeleri (8 Ekim 2026)
+
+- **Eşzamanlı agent oluşturma:** GitHub SHA sürüm kontrolüyle her güncelleme son şifreli agent listesinden tekrar hesaplanır; `a1` çakışması veya diğer agentın kaybolması önlenir.
+- **Eşzamanlı sohbet yanıtları:** Model aynı sohbet için iki ayrı istek alırsa mesajlar dosyanın en güncel sürümüne atomik eklenir. Gerçek Worker + GPT+ üzerinden iki eşzamanlı yanıt ve toplam altı mesaj testi başarılı.
+- **Daha iyi mobil bekleme:** `◈ Ekip` panelindeki *PC'ler hazır olana kadar bekle* işaretliyken önce seçilen agent PC'leri sorgulanır ve gerektiğinde başlatılır. 3 dakikalık sınırlı beklemeden sonra paralel model görevleri başlar; kullanıcı beklemeyi iptal edebilir. İşaret kaldırılırsa yalnızca model görevi anında çalıştırılır (PC hazır olmayabilir).
+- **PC heartbeat:** Yeni runner 3 dakikada bir çalıştığını bildirir; 10 dakika güncelleme yapmayan PC bağlantısı *stale* görünür ve yeniden başlatılabilir. Önceden açılmış eski runner'lar, kendi süreleri dolmadan yanlışlıkla stale olarak işaretlenmez.
+- **Şifreli checkpoint:** PC açıkken her 15 dakikada bir ve kapanırken yedekleme denenir. Eski yedek okunamazsa sessizce üzerine yazılmaz; hata gösterilir. Son verilerin saklanması, GitHub özel depo kotasına ve başarılı checkpoint'e bağlıdır.
+
+Bu sürüm **kalıcı açık sunucu değildir**: Cloudflare Worker sohbeti açar, GitHub Actions PC sadece belirli saatler çalışır. Otomatik görev bekleme, mobil sekme kapatılırsa devam etmez. Bağımsız, yeniden başlatılabilir arka plan görev kuyruğu ayrıca geliştirilmelidir.
+
+Doğrulama: [İki gerçek GPT+ yanıtı ve şifreli geçmişin canlı testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818302431) · [agent çakışması, PC eskimesi ve mobil UI testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818520475).
+
 ## Çoklu agent ve ayrı kalıcı PC sistemi
 
 **Mobil giriş:** <https://metodbox-direct-api.hanefimert2016.workers.dev/dot>. Giriş
