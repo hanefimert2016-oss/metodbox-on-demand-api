@@ -1,5 +1,24 @@
 # Metodbox On-Demand API
 
+## Android / Termux kurulum (PC gerekmez)
+
+Telefonunda **Termux** aç. Yeni şifreli veri deposunun PRIVATE olduğundan emin ol.
+
+```bash
+pkg update -y
+pkg install -y curl gh openssl
+curl -fsSL https://raw.githubusercontent.com/hanefimert2016-oss/metodbox-on-demand-api/main/github-runtime/setup-termux.sh -o ~/metodbox-termux.sh
+bash ~/metodbox-termux.sh
+```
+
+Telefon kurulum aracı GitHub hesabını tarayıcı üzerinden doğrular,
+**iki repo için tek bir fine-grained GitHub tokenı** ister, admin portal
+şifresini gizli olarak alır ve gerekli Actions Secrets değerlerini kaydeder.
+Mevcut Cloudflare kimlik bilgilerini yeniden oluşturmaz. İşlem sonunda
+**Configure Private Thread Storage** workflow'unun adresini açar; dağıtım
+oradan başlatılır. ngrok kurulumu gerekmez. Ayrıntılar:
+[AGENT_THREADS_INTEGRATION.md](AGENT_THREADS_INTEGRATION.md).
+
 ## Aktif sistem — Cloudflare Worker (ngrok GEREKMİYOR)
 
 - **Ana kod deposu:** [metodbox-on-demand-api](https://github.com/hanefimert2016-oss/metodbox-on-demand-api) (değişmedi)
