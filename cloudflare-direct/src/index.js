@@ -922,6 +922,12 @@ export default {
 
     const portalResponse = await handlePortalRequest(request, env, url);
     if (portalResponse) return portalResponse;
+    // Phone browsers visiting the domain root should see Dot instead of JSON.
+    // API clients using curl/*/* still receive the original health document.
+    if (request.method === "GET" && url.pathname === "/" &&
+        (request.headers.get("Accept") || "").includes("text/html")) {
+      return Response.redirect(url.origin + "/dot", 302);
+    }
 
     if (
       request.method === "GET" &&
