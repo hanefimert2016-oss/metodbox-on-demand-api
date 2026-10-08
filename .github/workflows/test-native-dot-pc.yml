@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/test-native-dot-pc.yml"
+      - "github-runtime/metodbox-desktop.ts"
+      - "github-runtime/patch-metodbox-desktop.py"
+      - "github-runtime/launch-agent-pc.sh"
 
 permissions:
   contents: read
@@ -68,6 +71,27 @@ jobs:
               const shot=await api("pc/screenshot","POST",{chatId,agentId},35000);
               if(typeof shot.base64!=="string"||shot.base64.length<600)throw Error("Missing screenshot");
               console.log(agentId,"screenshot OK, bytes:",shot.base64.length);
+              // Observe actual X11/Openbox desktop, not just a Playwright page.
+              const desktop=await api("pc/desktop","POST",{chatId,agentId},35000);
+              if(desktop.mode!=="openbox"||desktop.width!==1280)
+                throw Error("Linux Openbox GUI is not running");
+              const gui=await api("pc/desktop/screenshot","POST",{chatId,agentId},35000);
+              if(gui.surface!=="desktop"||typeof gui.base64!=="string"||gui.base64.length<1000)
+                throw Error("True Linux desktop screenshot missing");
+              console.log(agentId,"Openbox desktop captured OK");
+              if(pw.length>=12){
+                for(const [action,params] of [
+                  ["click",{x:140,y:150,button:1}],
+                  ["type",{text:"Metodbox GUI test"}],
+                  ["key",{key:"Return"}]
+                ]){
+                  const reply=await api("pc/desktop/action","POST",{chatId,agentId,action,...params},35000);
+                  if(reply.ok!==true)throw Error("Desktop mouse/keyboard action failed: "+action);
+                }
+                console.log(agentId,"Openbox mouse, type and key: OK");
+              }else{
+                console.log("Short password blocks GUI input; Linux screenshot still tested.");
+              }
               if(pw.length>=12){
                 const shell=await api("pc/exec","POST",{chatId,agentId,command:"pwd",timeoutMs:12000},35000);
                 if(shell?.error)throw Error("Shell returned error: "+shell.error);
