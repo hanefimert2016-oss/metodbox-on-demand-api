@@ -13,66 +13,81 @@ permissions:
 jobs:
   pc:
     runs-on: ubuntu-24.04
-    timeout-minutes: 9
+    timeout-minutes: 12
     env:
       PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
     steps:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Start real PC through Dot Worker, navigate, screenshot, stop
+      - name: Test chat-specific MAIN and CHILD PCs with browser and screenshot
         run: |
           set -euo pipefail
           node --input-type=module <<'JS'
           const base="https://metodbox-direct-api.hanefimert2016.workers.dev";
+          const pw=process.env.PORTAL_PASSWORD;
+          if(!pw)throw Error("Missing PORTAL_PASSWORD");
           const login=await fetch(base+"/apps/login",{
             method:"POST",headers:{Origin:base,"Content-Type":"application/x-www-form-urlencoded"},
-            body:new URLSearchParams({username:"admin",password:process.env.PORTAL_PASSWORD||""}),
-            redirect:"manual",signal:AbortSignal.timeout(30000)
+            body:new URLSearchParams({username:"admin",password:pw,return_to:"/dot"}),redirect:"manual",
+            signal:AbortSignal.timeout(30000)
           });
-          if(login.status!==303)throw Error("Login failed: HTTP "+login.status);
+          if(login.status!==303)throw Error("Login HTTP "+login.status);
           const cookie=login.headers.get("set-cookie")?.split(";")[0];
-          if(!cookie)throw Error("No cookie");
-          async function api(route,method="GET",body,timeout=30000){
+          async function api(route,method="GET",body,timeout=90000){
             const response=await fetch(base+"/dot/api/"+route,{
               method,headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
               ...(body?{body:JSON.stringify(body)}:{}),
               signal:AbortSignal.timeout(timeout)
             });
             const json=await response.json().catch(()=>({}));
-            if(!response.ok)throw Error(route+" HTTP "+response.status+": "+String(json.error||"").slice(0,300));
+            if(!response.ok)throw Error(route+" HTTP "+response.status+": "+String(json.error||"").slice(0,200));
             return json;
           }
-          let started=false;
+          let chatId=null;const pcIds=[];
           try {
-            const pre=await api("pc/status");
-            if(pre.status==="running"||["requested","starting","stopping"].includes(pre.status))throw Error("Dot PC is already running or transitioning; wait before retrying to avoid interrupting an active session");
-            const start=await api("pc/start","POST",{});
-            started=true;
-            console.log("Agent PC requested:",start.status);
-            let state;
-            for(let i=0;i<54;i++){
-              await new Promise(resolve=>setTimeout(resolve,5000));
-              state=await api("pc/status");
-              if(i%6===0)console.log("Dot PC startup:",state.status,String(state.message||"").slice(0,70));
-              if(state.status==="running")break;
-              if(state.status==="error")throw Error("Agent PC failed: "+String(state.message||"").slice(0,200));
+            const chat=await api("threads","POST",{title:"GitHub PC gerçek entegrasyon testi"});
+            chatId=chat.id;pcIds.push("main");
+            if(chat.pc?.status==="error")throw Error(chat.pc.message);
+            const children=await api("chats/"+chatId+"/agents","POST",{name:"PC Test Agent",task:"Örnek web sitesini aç"});
+            if(children.agents.length!==1)throw Error("Cannot create child PC");
+            pcIds.push(children.agents[0].id);
+            for(const agentId of pcIds){
+              let pc;
+              for(let i=0;i<65;i++){
+                pc=await api("pc/status?chatId="+chatId+"&agentId="+encodeURIComponent(agentId));
+                if(pc.status==="running")break;
+                if(pc.status==="error")throw Error("PC failed: "+pc.message);
+                await new Promise(resolve=>setTimeout(resolve,5000));
+              }
+              if(pc?.status!=="running")throw Error(agentId+" PC did not become ready");
+              console.log(agentId,"PC running.");
+              const page=await api("pc/navigate","POST",{chatId,agentId,url:"https://example.org"},35000);
+              if(!String(page.url||"").includes("example.org"))throw Error("Invalid browser navigation");
+              console.log(agentId,"browser navigation OK");
+              const shot=await api("pc/screenshot","POST",{chatId,agentId},35000);
+              if(typeof shot.base64!=="string"||shot.base64.length<600)throw Error("Missing screenshot");
+              console.log(agentId,"screenshot OK, bytes:",shot.base64.length);
+              if(pw.length>=12){
+                const shell=await api("pc/exec","POST",{chatId,agentId,command:"pwd",timeoutMs:12000},35000);
+                if(shell?.error)throw Error("Shell returned error: "+shell.error);
+                console.log(agentId,"isolated terminal OK");
+              } else {
+                const blocked=await fetch(base+"/dot/api/pc/exec",{
+                  method:"POST",headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
+                  body:JSON.stringify({chatId,agentId,command:"pwd"})});
+                if(blocked.status!==403)throw Error("Weak portal password failed to block exec");
+                console.log("Weak password shell protection OK");
+              }
             }
-            if(state?.status!=="running")throw Error("Agent PC did not become ready");
-            console.log("Dot PC started via Cloudflare + GitHub dispatch.");
-            const page=await api("pc/navigate","POST",{url:"https://example.org"},35000);
-            if(!String(page.url||"").includes("example.org"))throw Error("Navigation did not reach expected site");
-            console.log("Dot PC remote browser navigation OK, title length:",String(page.title||"").length);
-            const shot=await api("pc/screenshot","POST",{},35000);
-            if(typeof shot.base64!=="string"||shot.base64.length<500)
-              throw Error("Dot PC did not return screenshot bytes");
-            console.log("Dot PC remote screenshot OK, base64 bytes:",shot.base64.length);
-          }finally{
-            if(started){
-              try{
-                const stopped=await api("pc/stop","POST",{});
-                console.log("PC shutdown requested:",stopped.status);
-              }catch(e){console.error("PC cleanup stop failed:",e.message)}
+          } finally {
+            for(const agentId of pcIds){
+              try{await api("pc/stop","POST",{chatId,agentId},30000);console.log(agentId,"stop/checkpoint requested")}
+              catch(error){console.error("Stop request failed:",error.message)}
+            }
+            if(chatId){
+              try{await api("threads/"+chatId,"DELETE",undefined,30000);console.log("Test chat cleaned up")}
+              catch(error){console.error("Test chat cleanup failed:",error.message)}
             }
           }
           JS
