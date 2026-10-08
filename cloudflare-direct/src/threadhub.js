@@ -485,6 +485,7 @@ function cleanRoster(id,roster) {
   return {
     chatId:id,mainPcId:"ch-"+id,agents,
     allowExec:roster.allowExec===true,
+    allowDesktopAI:roster.allowDesktopAI===true,
     createdAt:Number(roster.createdAt)||Date.now(),updatedAt:Date.now()
   };
 }
@@ -497,7 +498,7 @@ export async function updateRoster(env,chatId,mutate){
   for(let i=0;i<7;i++){
     const prev=await readEncrypted(env,rosterPath(id),null);
     const original=prev.value||{
-      chatId:id,mainPcId:"ch-"+id,agents:[],allowExec:false,
+      chatId:id,mainPcId:"ch-"+id,agents:[],allowExec:false,allowDesktopAI:false,
       createdAt:Date.now(),updatedAt:Date.now()
     };
     const clean=cleanRoster(id,mutate(structuredClone(original)));
