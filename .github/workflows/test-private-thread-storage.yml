@@ -17,6 +17,9 @@ on:
       - "github-runtime/tests/portal-login.test.mjs"
       - "cloudflare-direct/src/portal.js"
       - "cloudflare-direct/src/dot.js"
+      - "cloudflare-direct/src/dot-agents.js"
+      - "cloudflare-direct/src/dot-team-ui.js"
+      - "github-runtime/tests/dot-multiagent.test.mjs"
       - "cloudflare-direct/src/dot-ui.js"
       - "cloudflare-direct/src/edge-tts.js"
       - "cloudflare-direct/src/index.js"
@@ -42,6 +45,8 @@ jobs:
           node --check cloudflare-direct/src/threadhub.js
           node --check cloudflare-direct/src/portal.js
           node --check cloudflare-direct/src/dot.js
+          node --check cloudflare-direct/src/dot-agents.js
+          node --check cloudflare-direct/src/dot-team-ui.js
           node --check cloudflare-direct/src/dot-ui.js
           node --check cloudflare-direct/src/edge-tts.js
           node --check cloudflare-direct/src/index.js
@@ -53,4 +58,4 @@ jobs:
           bash -n github-runtime/fix-secrets-termux.sh
           bash -n github-runtime/configure-voice-termux.sh
       - name: Mock GitHub API tests
-        run: node --test github-runtime/tests/threadhub-storage.test.mjs github-runtime/tests/portal-login.test.mjs github-runtime/tests/dot-native.test.mjs
+        run: node --test github-runtime/tests/threadhub-storage.test.mjs github-runtime/tests/portal-login.test.mjs github-runtime/tests/dot-native.test.mjs github-runtime/tests/dot-multiagent.test.mjs
