@@ -231,36 +231,63 @@ function runnerPage(app) {
     <div class="viewer-wrap">
       <div class="viewer-bar">
         <div class="row"><a class="btn secondary" href="/apps">← Geri</a><strong>${html(app.name)}</strong></div>
-        <div class="row"><span id="state" class="muted">Başlatılıyor…</span><span id="spin" class="spinner"></span><button class="btn danger" onclick="stopApp()">Durdur</button></div>
+        <div class="row"><span id="state" class="muted">Başlatılıyor…</span><span id="spin" class="spinner"></span><a class="btn secondary" id="external" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Yeni sekmede aç</a><button class="btn danger" onclick="stopApp()">Durdur</button></div>
       </div>
       <div id="waiting" class="shell" style="min-height:calc(100vh - 64px)">
-        <div style="text-align:center"><h2>${html(app.name)} hazırlanıyor</h2><p class="muted" id="detail">GitHub runner ve güvenli tünel başlatılıyor.</p></div>
+        <div style="text-align:center;max-width:540px">
+          <h2>${html(app.name)} hazırlanıyor</h2>
+          <p class="muted" id="detail">GitHub runner ve Cloudflare bağlantısı hazırlanıyor.</p>
+          <p class="muted" id="help">İlk kurulumda indirme ve derleme sürebilir. Bu sayfa işlemi otomatik takip eder.</p>
+          <p><a class="btn secondary" href="https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/launch-copilot-app.yml" target="_blank" rel="noopener noreferrer">GitHub Actions durumunu gör ↗</a></p>
+        </div>
       </div>
       <iframe id="frame" class="viewer" style="display:none" referrerpolicy="no-referrer"></iframe>
     </div>
     <script>
       const app=${JSON.stringify(app.id)};
+      const started=Date.now();
       async function poll(){
-        const r=await fetch('/apps/api/status?app='+app,{cache:'no-store'});
-        const j=await r.json();
         const state=document.getElementById('state');
         const detail=document.getElementById('detail');
-        if(!r.ok){state.textContent='Hata'; detail.textContent=j.error||'Durum alınamadı';return;}
-        state.textContent=j.status||'unknown';
-        if(j.status==='ready' && j.url){
-          document.getElementById('waiting').style.display='none';
-          document.getElementById('spin').style.display='none';
-          const frame=document.getElementById('frame');
-          if(frame.src!==j.url){frame.src=j.url;}
-          frame.style.display='block';
-          return;
-        }
-        if(j.status==='error'){
-          document.getElementById('spin').style.display='none';
-          detail.textContent=j.message||'Uygulama başlatılamadı.';
-        } else {
-          detail.textContent=j.message||'Uygulama hazırlanıyor…';
-          setTimeout(poll,2500);
+        const help=document.getElementById('help');
+        try {
+          const r=await fetch('/apps/api/status?app='+encodeURIComponent(app),{cache:'no-store'});
+          const j=await r.json();
+          if(!r.ok){state.textContent='Hata'; detail.textContent=j.error||'Durum alınamadı'; setTimeout(poll,5000);return;}
+          state.textContent=j.status||'unknown';
+          if(j.status==='ready' && j.url){
+            const external=document.getElementById('external');
+            const dest=new URL(j.url);
+            if(dest.protocol!=='https:' || !dest.hostname.endsWith('.trycloudflare.com')) {
+              state.textContent='Bağlantı hatası';
+              detail.textContent='Beklenmeyen çalışma adresi; GitHub Actions kayıtlarını kontrol et.';
+              document.getElementById('spin').style.display='none';
+              return;
+            }
+            external.href=dest.href;
+            external.style.display='inline-block';
+            document.getElementById('waiting').style.display='none';
+            document.getElementById('spin').style.display='none';
+            const frame=document.getElementById('frame');
+            if(frame.src!==dest.href){frame.src=dest.href;}
+            frame.style.display='block';
+            return;
+          }
+          if(j.status==='error' || j.status==='stopped'){
+            document.getElementById('spin').style.display='none';
+            detail.textContent=j.message||'Uygulama durdu. Ana sayfadan tekrar başlatabilirsiniz.';
+            help.textContent='Ayrıntılar için GitHub Actions bağlantısını aç.';
+            return;
+          }
+          detail.textContent=j.message||'GitHub Actions üzerinde hazırlanıyor…';
+          if(Date.now()-started>4*60*1000){
+            help.textContent='Başlatma uzun sürüyor. Hata mı, devam eden derleme mi olduğunu GitHub Actions sayfasından görebilirsin.';
+          }
+          setTimeout(poll,3000);
+        } catch(e) {
+          state.textContent='Yeniden bağlanıyor';
+          detail.textContent='Durum alınamadı. İnternet bağlantısı kontrol edilip yeniden denenecek.';
+          setTimeout(poll,5000);
         }
       }
       async function stopApp(){
