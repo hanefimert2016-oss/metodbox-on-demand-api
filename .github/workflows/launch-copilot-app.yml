@@ -33,6 +33,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       METODBOX_API_KEY: ${{ secrets.API_KEY }}
       CPK_INTELLIGENCE_API_KEY: ${{ secrets.CPK_INTELLIGENCE_API_KEY }}
+      VOICE_API_KEY: ${{ secrets.VOICE_API_KEY }}
+      VOICE_MODEL: ${{ vars.VOICE_MODEL || 'gpt-realtime-2.1' }}
+      VOICE_NAME: ${{ vars.VOICE_NAME || 'marin' }}
     steps:
       - name: Checkout launcher
         uses: actions/checkout@v4
