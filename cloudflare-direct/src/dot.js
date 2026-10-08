@@ -222,10 +222,15 @@ export async function handleDotRequest(request,env,url,callModel) {
       if(!parent||parent.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
       if(action==="list"&&request.method==="GET")return reply(await rosterFor(env,id));
       if(action==="permissions"&&request.method==="POST"){
-        if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"Terminal izni için önce 12+ karakterli güçlü portal şifresi belirle."},403);
+        if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"AI masaüstü veya terminal yetkisi için önce 12+ karakterli güçlü portal şifresi belirle."},403);
         const input=await parseBody(request);
-        if(typeof input.allowExec!=="boolean")return reply({error:"İzin değeri gerekli"},400);
-        return reply(await updateRoster(env,id,current=>({...current,allowExec:input.allowExec})));
+        if(typeof input.allowExec!=="boolean" && typeof input.allowDesktopAI!=="boolean")
+          return reply({error:"İzin değeri gerekli"},400);
+        return reply(await updateRoster(env,id,current=>({
+          ...current,
+          ...(typeof input.allowExec==="boolean"?{allowExec:input.allowExec}:{}),
+          ...(typeof input.allowDesktopAI==="boolean"?{allowDesktopAI:input.allowDesktopAI}:{})
+        })));
       }
       if(action==="list"&&request.method==="POST"){
         const input=await parseBody(request,10000);
@@ -288,6 +293,8 @@ export async function handleDotRequest(request,env,url,callModel) {
       if(path==="pc/desktop"&&request.method==="POST")return reply(await computerCall(env,"desktopInfo",{},pcId));
       if(path==="pc/desktop/screenshot"&&request.method==="POST")return reply(await computerCall(env,"desktopShot",{},pcId));
       if(path==="pc/desktop/action"&&request.method==="POST"){
+        if(String(env.PORTAL_PASSWORD||"").length<12)
+          return reply({error:"Güvenlik: masaüstü kontrolü için portal şifresini 12+ karakter yap ve Cloudflare'a dağıt."},403);
         const kinds={click:"desktopClick",move:"desktopMove",type:"desktopType",key:"desktopKey",scroll:"desktopScroll"};
         if(!Object.prototype.hasOwnProperty.call(kinds,body.action))return reply({error:"Invalid desktop action"},400);
         // Direct interactive use by authenticated human. Autonomous model tools
