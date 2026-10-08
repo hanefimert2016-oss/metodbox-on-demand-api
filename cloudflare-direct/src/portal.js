@@ -420,6 +420,23 @@ export async function handlePortalRequest(request, env, url) {
     const app = requireApp(payload.app);
     if (!app) return Response.json({ error: "Geçersiz uygulama" }, { status: 400 });
 
+    // Multiple taps on mobile must not dispatch more GitHub jobs. Each new
+    // dispatch cancels an existing same-app workflow because of concurrency.
+    const existingRaw = await env.AUTH_KV.get(`copilot_runtime:${app.id}`);
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        if (["requested", "starting", "ready"].includes(existing.status)) {
+          return Response.json({
+            ok: true,
+            app: app.id,
+            status: existing.status,
+            already_running: true,
+          });
+        }
+      } catch (_) {}
+    }
+
     await env.AUTH_KV.delete(`copilot_stop:${app.id}`);
     await env.AUTH_KV.put(
       `copilot_runtime:${app.id}`,
