@@ -1,0 +1,90 @@
+name: Diagnose Metodbox Model and Agent PC
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "github-runtime/launch-agent-pc.sh"
+      - "github-runtime/patch-opendots.py"
+      - ".github/workflows/diagnose-metodbox-runtime.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  model-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    steps:
+      - name: Test real model API with GitHub secret (never print token)
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          set -euo pipefail
+          : "${API_KEY:?API_KEY secret missing}"
+          echo "Checking GPT+ model gateway through Cloudflare Worker..."
+          curl --silent --show-error --fail --max-time 120 \
+            -H "Authorization: Bearer $API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"gpt-5.1","stream":false,"messages":[{"role":"user","content":"Respond with one word: ready"}],"max_tokens":32}' \
+            'https://metodbox-direct-api.hanefimert2016.workers.dev/v1/chat/completions' \
+            -o /tmp/metodbox-smoke.json
+          python3 - <<'PY'
+          import json
+          data = json.load(open('/tmp/metodbox-smoke.json'))
+          message=(data.get('choices') or [{}])[0].get('message') or {}
+          text=message.get('content') or ''
+          if isinstance(text, list):
+              text=' '.join(str(i.get('text', '')) for i in text if isinstance(i, dict))
+          print('choices:', len(data.get('choices') or []), 'assistant_chars:', len(str(text)))
+          if not str(text).strip():
+              raise SystemExit('ERROR: model gateway returned no assistant message')
+          print('Model gateway smoke succeeded; actual answer omitted.')
+          PY
+
+  computer-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact OpenBot agent-computer Docker image
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/openbot-agent-source
+          git -C /tmp/openbot-agent-source checkout aff4981e0734f15ff2fc68c86a32f765e0cae2b2
+          docker build -f /tmp/openbot-agent-source/agent-computer/Dockerfile \
+            -t metodbox-agent-pc-smoke /tmp/openbot-agent-source
+      - name: Start container with same runtime security configuration
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/agent-smoke/workspace /tmp/agent-smoke/profiles
+          docker run -d --name metodbox-agent-pc-smoke \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            --pids-limit 512 --shm-size 1g --memory 6g \
+            -p 127.0.0.1:4100:4100 \
+            -e COMPUTER_TOKEN=metodbox-diagnostic-token-not-real \
+            -e COMPUTER_BOT_ID=smoke \
+            -e EGRESS_POLICY_REQUIRED=0 \
+            -e WORKSPACE_DIR=/workspace -e PROFILES_DIR=/profiles \
+            -v /tmp/agent-smoke/workspace:/workspace \
+            -v /tmp/agent-smoke/profiles:/profiles \
+            metodbox-agent-pc-smoke
+          ready=0
+          for attempt in $(seq 1 25); do
+            if curl -fsS --max-time 2 http://127.0.0.1:4100/health >/tmp/agent-smoke-health.json 2>/dev/null; then
+              ready=1
+              break
+            fi
+            if [ "$(docker inspect --format '{{.State.Running}}' metodbox-agent-pc-smoke)" != "true" ]; then
+              break
+            fi
+            sleep 2
+          done
+          docker inspect --format 'Docker status={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' metodbox-agent-pc-smoke
+          docker logs --tail 80 metodbox-agent-pc-smoke
+          test "$ready" = 1 || { echo "::error::Docker agent-computer is not healthy"; exit 1; }
+          echo "Agent PC reached /health."
+      - name: Cleanup diagnostic container
+        if: always()
+        run: docker rm -f metodbox-agent-pc-smoke || true
