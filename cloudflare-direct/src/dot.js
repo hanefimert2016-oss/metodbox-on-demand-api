@@ -152,7 +152,7 @@ async function executeAgentTool(name,args,context) {
     if(name==="dot_desktop_key"){
       return computerCall(env,"desktopKey",{key:String(args?.key||"").slice(0,64)},agentId);
     }
-    if(name==="dot_desktop_see" && env.DOT_DESKTOP_VISION_ENABLED==="true"){
+    if(name==="dot_desktop_see" && env.DOT_DESKTOP_VISION_ENABLED!=="false"){
       const shot=await computerCall(env,"desktopShot",{},agentId);
       return {__image:shot.base64,width:shot.width,height:shot.height};
     }
@@ -171,7 +171,7 @@ async function executeAgentTool(name,args,context) {
   throw Error("Unknown or unauthorized tool: "+name);
 }
 async function modelLoop(env,callModel,messages,context) {
-  const available=modelTools(context.allowSpawn,context.allowExec,context.allowDesktopAI,env.DOT_DESKTOP_VISION_ENABLED==="true");
+  const available=modelTools(context.allowSpawn,context.allowExec,context.allowDesktopAI,env.DOT_DESKTOP_VISION_ENABLED!=="false");
   for(let round=0;round<4;round++){
     const output=await callModel({
       model:DEFAULT_MODEL,stream:false,max_completion_tokens:1600,
@@ -220,7 +220,7 @@ async function answerFromModel(env,callModel,history,text,chatId) {
   const roster=await getRoster(env,chatId);
   const messages=[
     {role:"system",content:"Sen Metodbox Dot ana agentsın. Bu sohbetin kendi ana PC kimliği "+mainPcId(chatId)+
-      ". Her yeni sohbet farklı PC açar, bu sohbetin tüm alt agentları ayrı PC/workspace kullanır. Gerekirse dot_spawn_agents aracıyla en çok 3 alt agentı aynı anda farklı görevlere yönlendir ve sonuçları birleştir. Mevcut "+roster.agents.length+" alt agent bulunuyor (üst sınır 6). Kendi bilgisayarın yalnızca GitHub Actions izole PC'dir; PC hazır değilken işlem yaptığını iddia etme. Terminal yetkisi "+(roster.allowExec?"kullanıcı tarafından onaylıdır.":"onaylanmamıştır.")+" Yanıtları Türkçe, anlaşılır ve dürüst ver."},
+      ". Her yeni sohbet farklı PC açar. Bilgisayarda ekran görüntüsü görme ve fare/klavye eylemleri ancak allowDesktopAI kullanıcının izniyle etkinleşir; izin yoksa masaüstü kontrolü yapıyormuş gibi davranma. Gerekirse dot_spawn_agents aracıyla en çok 3 alt agentı aynı anda farklı görevlere yönlendir ve sonuçları birleştir. Mevcut "+roster.agents.length+" alt agent bulunuyor (üst sınır 6). Kendi bilgisayarın yalnızca GitHub Actions izole PC'dir; PC hazır değilken işlem yaptığını iddia etme. Terminal yetkisi "+(roster.allowExec?"kullanıcı tarafından onaylıdır.":"onaylanmamıştır.")+" Yanıtları Türkçe, anlaşılır ve dürüst ver."},
     ...history.filter(m=>m&&["user","assistant"].includes(m.role)&&typeof m.content==="string").slice(-20).map(m=>({role:m.role,content:m.content.slice(0,5000)})),
     {role:"user",content:text}
   ];
