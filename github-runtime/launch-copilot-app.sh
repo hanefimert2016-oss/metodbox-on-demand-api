@@ -197,18 +197,24 @@ if [[ "$APP" == "opendots" ]]; then
   echo "Launching Metodbox OpenDots fork..."
   prepare_data_branch
 
-  progress "OpenDots kaynak kodu GitHub üzerinden indiriliyor."
-  rm -rf /tmp/opendots
-  git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenDots.git /tmp/opendots
-  git -C /tmp/opendots checkout "$OPENDOTS_COMMIT"
-
-  progress "OpenDots Metodbox ThreadHub entegrasyonu kuruluyor."
-  python3 "$CONTROL_ROOT/github-runtime/patch-opendots.py" /tmp/opendots
+  if [[ "${OPENDOTS_CACHE_HIT:-}" == "true" && -d /tmp/opendots/node_modules && -f /tmp/opendots/package.json ]]; then
+    progress "Hazır OpenDots üretim paketi önbellekten açıldı; derleme atlanıyor."
+    echo "Using prebuilt OpenDots; skipping git clone, npm ci and npm run build."
+    USING_PREBUILT_OPENDOTS=1
+  else
+    USING_PREBUILT_OPENDOTS=0
+    progress "İlk/önbelleksiz açılış: OpenDots kaynak kodu indiriliyor."
+    rm -rf /tmp/opendots
+    git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenDots.git /tmp/opendots
+    git -C /tmp/opendots checkout "$OPENDOTS_COMMIT"
+    progress "OpenDots Metodbox ThreadHub entegrasyonu kuruluyor."
+    python3 "$CONTROL_ROOT/github-runtime/patch-opendots.py" /tmp/opendots
+    progress "OpenDots bağımlılıkları kuruluyor."
+    cd /tmp/opendots
+    npm ci --no-audit --no-fund
+  fi
   restore_opendots_state
-
-  progress "OpenDots Node.js bağımlılıkları yükleniyor; ilk açılış uzun sürebilir."
   cd /tmp/opendots
-  npm ci --no-audit --no-fund
 
   OWNER_TOKEN="$(openssl rand -hex 32)"
   PUBLIC_URL="${TUNNEL_URL}/?access_token=${OWNER_TOKEN}"
@@ -238,8 +244,10 @@ COPILOTKIT_TELEMETRY_DISABLED=true
 DO_NOT_TRACK=1
 EOF
 
-  progress "OpenDots web arayüzü derleniyor; lütfen bekleyin."
-  npm run build
+  if [[ "$USING_PREBUILT_OPENDOTS" != "1" ]]; then
+    progress "OpenDots arayüzü ilk kez derleniyor; lütfen bekleyin."
+    npm run build
+  fi
   progress "OpenDots HTTP sunucusu başlatılıyor."
   npm start >/tmp/app.log 2>&1 &
   APP_PID=$!
