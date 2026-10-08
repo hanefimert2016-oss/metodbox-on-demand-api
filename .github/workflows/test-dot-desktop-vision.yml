@@ -1,0 +1,45 @@
+name: Test Dot Desktop Vision Gateway
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-dot-desktop-vision.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  vision:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    env:
+      API_KEY: ${{ secrets.API_KEY }}
+    steps:
+      - name: Check whether the existing GPT+ gateway accepts image inputs
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          if(!process.env.API_KEY)throw Error("API_KEY is missing");
+          const pixel="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6u9pgAAAAASUVORK5CYII=";
+          const result=await fetch("https://metodbox-direct-api.hanefimert2016.workers.dev/v1/chat/completions",{
+            method:"POST",
+            headers:{"Authorization":"Bearer "+process.env.API_KEY,"Content-Type":"application/json"},
+            body:JSON.stringify({model:"gpt-5.1",stream:false,max_tokens:75,
+              messages:[{role:"user",content:[
+                {type:"text",text:"Briefly describe whether an image was attached."},
+                {type:"image_url",image_url:{url:"data:image/png;base64,"+pixel}}
+              ]}]
+            }),signal:AbortSignal.timeout(90000)
+          });
+          if(!result.ok){
+            const response=await result.text();
+            console.log("DESKTOP_VISION_UNSUPPORTED HTTP",result.status,response.slice(0,220));
+            // This model capability is optional. Never break existing text/PC use.
+          }else{
+            const data=await result.json();
+            const text=data?.choices?.[0]?.message?.content;
+            console.log("DESKTOP_VISION_ACCEPTED",Boolean(String(text||"").trim()),"response_chars",String(text||"").length);
+          }
+          JS
