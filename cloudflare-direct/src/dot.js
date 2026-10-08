@@ -40,7 +40,17 @@ async function computerToken(env,agentId) {
 async function computerCall(env, kind, body,agentId) {
   const current=await pcState(env,agentId);
   const target=pcUrl(current);
-  const allowed = { screenshot:["GET","/screenshot"], navigate:["POST","/navigate"], exec:["POST","/exec"], snapshot:["POST","/snapshot"] };
+  const allowed = {
+    screenshot:["GET","/screenshot"],navigate:["POST","/navigate"],exec:["POST","/exec"],
+    snapshot:["POST","/snapshot"],
+    desktopInfo:["GET","/desktop/info"],
+    desktopShot:["GET","/desktop/screenshot"],
+    desktopClick:["POST","/desktop/click"],
+    desktopMove:["POST","/desktop/move"],
+    desktopType:["POST","/desktop/type"],
+    desktopKey:["POST","/desktop/key"],
+    desktopScroll:["POST","/desktop/scroll"]
+  };
   const route=allowed[kind];
   if(!route) throw Error("Computer action not allowed");
   const [method,path]=route;
@@ -275,6 +285,15 @@ export async function handleDotRequest(request,env,url,callModel) {
       if(path==="pc/stop"&&request.method==="POST")return reply(await stopPc(env,pcId));
       if(path==="pc/navigate"&&request.method==="POST")return reply(await computerCall(env,"navigate",{url:validatePublicUrl(body.url)},pcId));
       if(path==="pc/screenshot"&&request.method==="POST")return reply(await computerCall(env,"screenshot",{},pcId));
+      if(path==="pc/desktop"&&request.method==="POST")return reply(await computerCall(env,"desktopInfo",{},pcId));
+      if(path==="pc/desktop/screenshot"&&request.method==="POST")return reply(await computerCall(env,"desktopShot",{},pcId));
+      if(path==="pc/desktop/action"&&request.method==="POST"){
+        const kinds={click:"desktopClick",move:"desktopMove",type:"desktopType",key:"desktopKey",scroll:"desktopScroll"};
+        if(!Object.prototype.hasOwnProperty.call(kinds,body.action))return reply({error:"Invalid desktop action"},400);
+        // Direct interactive use by authenticated human. Autonomous model tools
+        // are separately restricted by the per-chat Desktop AI consent flag.
+        return reply(await computerCall(env,kinds[body.action],body,pcId));
+      }
       if(path==="pc/exec"&&request.method==="POST"){
         if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"Uzaktan terminal için 12+ karakterli güçlü portal şifresi gerekli."},403);
         if(typeof body.command!=="string"||!body.command.trim()||body.command.length>1500)return reply({error:"Geçersiz komut"},400);
