@@ -66,3 +66,22 @@ test("cross-origin POST attempt is rejected", async () => {
   }), env, new URL("https://worker.example" + path));
   assert.equal(response.status, 403);
 });
+
+test("ready OpenDots opens at top level rather than forbidden iframe", async () => {
+  const env = makeEnv();
+  const login = await handlePortalRequest(
+    req("POST", "/apps/login", {body:{username:"admin",password:"2026"},ip:"192.0.2.201"}),
+    env, new URL("https://worker.example/apps/login")
+  );
+  assert.equal(login.status, 303);
+  const cookie = login.headers.get("Set-Cookie").split(";")[0];
+  const response = await handlePortalRequest(
+    req("GET", "/apps/run/opendots", {headers:{Cookie:cookie}}),
+    env, new URL("https://worker.example/apps/run/opendots")
+  );
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.ok(html.includes("window.location.replace(dest.href)"));
+  assert.equal(html.includes("<iframe"), false);
+  assert.ok(html.includes("dest.hostname.endsWith('.trycloudflare.com')"));
+});
