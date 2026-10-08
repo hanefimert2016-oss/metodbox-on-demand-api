@@ -38,6 +38,7 @@ obj = {
     "agentId": agent,
     "status": status,
     "message": message,
+    "heartbeat": True,
     "updated_at": int(time.time() * 1000),
 }
 if url:
