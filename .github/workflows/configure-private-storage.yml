@@ -1,0 +1,49 @@
+name: Configure Private Thread Storage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout the existing Cloudflare Worker
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate private data repo and credentials
+        env:
+          GH_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${GH_TOKEN:?AGENT_STORAGE_TOKEN secret eksik}"
+          visibility="$(gh api repos/hanefimert2016-oss/ai-application-suite-1 --jq '.private')"
+          if [ "$visibility" != "true" ]; then
+            echo "::error::Persistent data repo must be PRIVATE"
+            exit 1
+          fi
+          gh api repos/hanefimert2016-oss/ai-application-suite-1/branches/agent-data --jq .name
+      - name: Setup Wrangler
+        run: npm install --no-audit --no-fund
+      - name: Set private storage and dispatch Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AGENT_STORAGE_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
+          AGENT_DISPATCH_TOKEN: ${{ secrets.AGENT_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?Cloudflare token missing}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Cloudflare account ID missing}"
+          : "${AGENT_STORAGE_TOKEN:?AGENT_STORAGE_TOKEN missing}"
+          : "${AGENT_DISPATCH_TOKEN:?AGENT_DISPATCH_TOKEN missing}"
+          printf '%s' "$AGENT_STORAGE_TOKEN" | npx wrangler secret put GITHUB_STORAGE_TOKEN
+          printf '%s' 'hanefimert2016-oss/ai-application-suite-1' | npx wrangler secret put GITHUB_STORAGE_REPO
+          printf '%s' 'agent-data' | npx wrangler secret put GITHUB_STORAGE_BRANCH
+          printf '%s' 'hanefimert2016-oss/metodbox-on-demand-api' | npx wrangler secret put GITHUB_LAUNCH_REPO
+          printf '%s' "$AGENT_DISPATCH_TOKEN" | npx wrangler secret put GITHUB_TRIGGER_TOKEN
+          echo "Private encrypted ThreadHub storage configured; existing Worker routes preserved." >> "$GITHUB_STEP_SUMMARY"
