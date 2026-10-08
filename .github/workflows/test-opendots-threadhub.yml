@@ -1,0 +1,46 @@
+name: Test OpenDots ThreadHub Fork
+
+on:
+  push:
+    paths:
+      - "github-runtime/opendots-threadhub.ts"
+      - "github-runtime/opendots-overlay/**"
+      - "github-runtime/patch-opendots.py"
+      - ".github/workflows/test-opendots-threadhub.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout control repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Clone pinned OpenDots
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenDots.git /tmp/opendots
+          git -C /tmp/opendots checkout 625452e06cde74cb25b0ce319e2c1be0488f5a5f
+
+      - name: Apply Metodbox fork
+        run: python3 github-runtime/patch-opendots.py /tmp/opendots
+
+      - name: Install
+        working-directory: /tmp/opendots
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        working-directory: /tmp/opendots
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: /tmp/opendots
+        run: npm run build
