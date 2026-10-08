@@ -46,7 +46,7 @@ jobs:
           let started=false;
           try {
             const pre=await api("pc/status");
-            if(pre.status==="running")throw Error("Dot PC already running; not overwriting existing user session");
+            if(pre.status==="running"||["requested","starting","stopping"].includes(pre.status))throw Error("Dot PC is already running or transitioning; wait before retrying to avoid interrupting an active session");
             const start=await api("pc/start","POST",{});
             started=true;
             console.log("Agent PC requested:",start.status);
