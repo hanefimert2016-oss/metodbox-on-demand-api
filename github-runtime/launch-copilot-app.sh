@@ -11,6 +11,7 @@ APP_PID=""
 TUNNEL_PID=""
 TUNNEL_URL=""
 PUBLIC_URL=""
+CURRENT_STAGE="GitHub runner başlatılıyor."
 DATA_WORKTREE="/tmp/metodbox-app-data"
 OPENDOTS_STATE="$DATA_WORKTREE/agent-storage/apps/opendots/state.tar.gz.enc"
 OPENDOTS_COMMIT="625452e06cde74cb25b0ce319e2c1be0488f5a5f"
@@ -48,6 +49,12 @@ kv_put() {
 
 set_status() {
   kv_put "$RUNTIME_KEY" "$(json_status "$1" "$2" "${3:-}")"
+}
+
+progress() {
+  CURRENT_STAGE="$1"
+  echo "::notice::${CURRENT_STAGE}"
+  set_status "starting" "$CURRENT_STAGE"
 }
 
 prepare_data_branch() {
@@ -127,7 +134,7 @@ cleanup() {
 
   if [[ $code -ne 0 ]]; then
     tail -n 100 /tmp/app.log 2>/dev/null || true
-    set_status "error" "Runtime başlatılamadı. GitHub Actions logunu kontrol et."
+    set_status "error" "Başlatma başarısız: ${CURRENT_STAGE}. GitHub Actions → Launch Copilot App kayıtlarını kontrol et."
   fi
   exit "$code"
 }
@@ -147,11 +154,12 @@ fi
 # OpenDots no longer needs CopilotKit Intelligence. OpenBot still uses its
 # upstream Intelligence integration until its larger runtime fork is finished.
 if [[ "$APP" == "openbot" && -z "${CPK_INTELLIGENCE_API_KEY:-}" ]]; then
-  set_status "error" "OpenBot için eski Intelligence adapteri hâlâ CPK anahtarı istiyor. OpenDots artık tamamen ThreadHub kullanıyor."
+  CURRENT_STAGE="OpenBot, CopilotKit Intelligence anahtarı olmadan çalışmıyor. OpenDots seç."
+  set_status "error" "$CURRENT_STAGE"
   exit 5
 fi
 
-set_status "starting" "GitHub runner hazırlanıyor."
+progress "GitHub runner başlatıldı; güvenli bağlantı hazırlanıyor."
 npx wrangler kv key delete --namespace-id="$KV_ID" "$STOP_KEY" --remote >/dev/null 2>&1 || true
 
 if [[ "$APP" == "openbot" ]]; then
@@ -160,10 +168,12 @@ else
   PORT=4310
 fi
 
+progress "Cloudflare Quick Tunnel indiriliyor (ngrok gerekmiyor)."
 echo "Installing cloudflared..."
 curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /tmp/cloudflared
 chmod +x /tmp/cloudflared
 
+progress "Cloudflare Quick Tunnel bağlantısı kuruluyor."
 echo "Starting quick tunnel for localhost:$PORT..."
 /tmp/cloudflared tunnel --no-autoupdate --url "http://127.0.0.1:$PORT" >/tmp/cloudflared.log 2>&1 &
 TUNNEL_PID=$!
@@ -180,19 +190,23 @@ if [[ -z "$TUNNEL_URL" ]]; then
   exit 6
 fi
 
-set_status "starting" "$APP indiriliyor ve başlatılıyor."
+progress "$APP bağımlılıkları ve çalışma ortamı hazırlanıyor."
 
 if [[ "$APP" == "opendots" ]]; then
+  progress "OpenDots için özel şifreli veri deposu kontrol ediliyor."
   echo "Launching Metodbox OpenDots fork..."
   prepare_data_branch
 
+  progress "OpenDots kaynak kodu GitHub üzerinden indiriliyor."
   rm -rf /tmp/opendots
   git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenDots.git /tmp/opendots
   git -C /tmp/opendots checkout "$OPENDOTS_COMMIT"
 
+  progress "OpenDots Metodbox ThreadHub entegrasyonu kuruluyor."
   python3 "$CONTROL_ROOT/github-runtime/patch-opendots.py" /tmp/opendots
   restore_opendots_state
 
+  progress "OpenDots Node.js bağımlılıkları yükleniyor; ilk açılış uzun sürebilir."
   cd /tmp/opendots
   npm ci --no-audit --no-fund
 
@@ -224,7 +238,9 @@ COPILOTKIT_TELEMETRY_DISABLED=true
 DO_NOT_TRACK=1
 EOF
 
+  progress "OpenDots web arayüzü derleniyor; lütfen bekleyin."
   npm run build
+  progress "OpenDots HTTP sunucusu başlatılıyor."
   npm start >/tmp/app.log 2>&1 &
   APP_PID=$!
 
@@ -255,6 +271,7 @@ EOF
   PUBLIC_URL="$TUNNEL_URL"
 fi
 
+progress "$APP açılış ve HTTP erişim testi yapılıyor."
 echo "Waiting for runtime..."
 ready=0
 for _ in $(seq 1 240); do
