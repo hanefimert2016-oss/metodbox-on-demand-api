@@ -22,11 +22,17 @@ echo
 
 for cmd in gh openssl curl; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "Eksik Termux paketleri kuruluyor..."
+    echo "Eksik Termux komutları kuruluyor (openssl CLI = openssl-tool)..."
     pkg update -y
-    pkg install -y gh openssl curl
+    pkg install -y gh openssl-tool curl
     break
   fi
+done
+for cmd in gh openssl curl; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "Termux komutu eksik: $cmd" >&2
+    exit 1
+  }
 done
 
 if ! gh auth status >/dev/null 2>&1; then
