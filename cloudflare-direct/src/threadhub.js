@@ -54,7 +54,7 @@ function githubConfig(env) {
   // Legacy GITHUB_TRIGGER_TOKEN remains a fallback for existing encrypted data.
   const token = String(env.GITHUB_STORAGE_TOKEN || env.GITHUB_TRIGGER_TOKEN || "").trim();
   if (!token) throw new Error("GITHUB_STORAGE_TOKEN Worker secret eksik");
-  const repo = String(env.GITHUB_STORAGE_REPO || DEFAULT_REPO);
+  const repo = String(env.GITHUB_STORAGE_REPO || "hanefimert2016-oss/Metodbox-secret-system");
   const branch = String(env.GITHUB_STORAGE_BRANCH || DATA_BRANCH);
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
     throw new Error("GITHUB_STORAGE_REPO invalid");
@@ -65,6 +65,23 @@ function githubConfig(env) {
   // A private repo is strongly recommended, as plaintext repo-level metadata
   // and encrypted files are still visible to everyone in a public repository.
   return { token, repo, branch };
+}
+
+// Fail closed when the storage repository is public or inaccessible.
+const privacyCache = new Map();
+async function assertPrivateStorage(env) {
+  const cfg = githubConfig(env);
+  const cached = privacyCache.get(cfg.repo);
+  if (cached && cached.expires > Date.now() && cached.token === cfg.token) return;
+  const response = await fetch("https://api.github.com/repos/" + cfg.repo, {
+    headers: githubHeaders(env),
+  });
+  if (!response.ok) throw new Error("GitHub private storage visibility check failed");
+  const metadata = await response.json();
+  if (metadata.private !== true) throw new Error(
+    "Storage repository is PUBLIC. Change Metodbox-secret-system to PRIVATE before storing agent data."
+  );
+  privacyCache.set(cfg.repo, { expires: Date.now() + 60_000, token: cfg.token });
 }
 
 function githubHeaders(env) {
@@ -129,6 +146,7 @@ async function decryptObject(env, encoded) {
 }
 
 async function githubRead(env, path) {
+  await assertPrivateStorage(env);
   const { repo, branch } = githubConfig(env);
   const response = await fetch(
     "https://api.github.com/repos/" +
@@ -155,6 +173,7 @@ async function githubRead(env, path) {
 }
 
 async function githubWrite(env, path, text, sha, message) {
+  await assertPrivateStorage(env);
   const { repo, branch } = githubConfig(env);
   const body = {
     message: message || "threadhub: update encrypted data",
@@ -189,6 +208,7 @@ async function githubWrite(env, path, text, sha, message) {
 }
 
 async function githubDelete(env, path, sha, message) {
+  await assertPrivateStorage(env);
   const { repo, branch } = githubConfig(env);
   const response = await fetch(
     "https://api.github.com/repos/" +
