@@ -14,6 +14,8 @@ PROFILES="$WORKROOT/profiles"
 DATA_DIR="/tmp/agent-data"
 ARCHIVE_PATH="$DATA_DIR/agent-storage/pcs/${AGENT_ID}/state.tar.gz.enc"
 source "$(dirname "${BASH_SOURCE[0]}")/storage-git.sh"
+RESTORE_FAILED=0
+CHECKPOINT_INTERVAL=900  # 15-minute encrypted snapshots while the VM is running
 
 if [[ ! "$AGENT_ID" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
   echo "Invalid agent id: $AGENT_ID" >&2
@@ -82,47 +84,61 @@ restore_state() {
   if openssl enc -d -aes-256-cbc -pbkdf2       -pass env:METODBOX_API_KEY       -in "$ARCHIVE_PATH"       2>/tmp/state-decrypt.err | tar -xzf - -C "$WORKROOT"; then
     echo "Agent state restored."
   else
-    echo "Stored state could not be decrypted; starting with clean state." >&2
+    echo "::error::Existing encrypted snapshot could not be decrypted. Refusing clean boot or overwrite to protect stored files." >&2
     cat /tmp/state-decrypt.err >&2 || true
-    rm -rf "$WORKSPACE" "$PROFILES"
-    mkdir -p "$WORKSPACE" "$PROFILES"
+    RESTORE_FAILED=1
+    return 1
   fi
 }
 
 persist_state() {
-  set +e
-  mkdir -p "$(dirname "$ARCHIVE_PATH")"
-  local tmp="/tmp/agent-state-${AGENT_ID}.tar.gz.enc"
-
-  # Browser profiles are useful for login continuity but can grow quickly.
-  # First try both. If the encrypted snapshot would exceed 80 MiB, keep the
-  # durable workspace only so GitHub never hits its 100 MiB single-file limit.
-  tar -C "$WORKROOT" -czf - workspace profiles 2>/dev/null |     openssl enc -aes-256-cbc -pbkdf2 -salt       -pass env:METODBOX_API_KEY -out "$tmp"
-
-  local bytes=0
-  [[ -f "$tmp" ]] && bytes="$(stat -c %s "$tmp" 2>/dev/null || echo 0)"
-  if (( bytes > 83886080 )); then
-    echo "Full PC snapshot is too large; persisting workspace without browser profile."
-    tar -C "$WORKROOT" -czf - workspace 2>/dev/null |       openssl enc -aes-256-cbc -pbkdf2 -salt         -pass env:METODBOX_API_KEY -out "$tmp"
-  fi
-
-  mv "$tmp" "$ARCHIVE_PATH"
-  git -C "$DATA_DIR" add "agent-storage/pcs/${AGENT_ID}/state.tar.gz.enc"
-  if git -C "$DATA_DIR" diff --cached --quiet; then
-    return 0
-  fi
-
-  git -C "$DATA_DIR" config user.name "Metodbox Agent Storage"
-  git -C "$DATA_DIR" config user.email "actions@users.noreply.github.com"
-  git -C "$DATA_DIR" commit -m "storage: save PC state for ${AGENT_ID}"
-
-  if storage_push "$DATA_DIR"; then
-    echo "Encrypted PC state persisted to the private repository."
-  else
-    echo "WARNING: Private PC state persistence FAILED. Check workflow logs." >&2
+  if [[ "$RESTORE_FAILED" == "1" || ! -d "$DATA_DIR/.git" || ! -d "$WORKSPACE" ]]; then
+    echo "::warning::No safe PC snapshot source; previous stored data remains unchanged." >&2
     return 1
   fi
-  return 0
+  mkdir -p "$(dirname "$ARCHIVE_PATH")"
+  local tmp="/tmp/agent-state-${AGENT_ID}.tar.gz.enc" bytes=0
+  rm -f "$tmp"
+  # Root-owned bind mounts are readable through sudo even while the container
+  # is running. Never chmod 777 or change ownership of a live browser profile.
+  if ! sudo tar -C "$WORKROOT" -czf - workspace profiles 2>/dev/null | \
+    openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:METODBOX_API_KEY -out "$tmp"; then
+    echo "::warning::Full snapshot interrupted; retrying workspace only." >&2
+    rm -f "$tmp"
+  fi
+  [[ -f "$tmp" ]] && bytes="$(stat -c %s "$tmp" 2>/dev/null || echo 0)"
+  if (( bytes > 83886080 || bytes < 128 )); then
+    echo "Browser profile snapshot unavailable or over 80 MiB; trying workspace-only backup."
+    rm -f "$tmp"
+    if ! sudo tar -C "$WORKROOT" -czf - workspace 2>/dev/null | \
+      openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:METODBOX_API_KEY -out "$tmp"; then
+      rm -f "$tmp"; echo "::warning::Workspace snapshot failed; old backup retained." >&2
+      return 1
+    fi
+  fi
+  bytes="$(stat -c %s "$tmp" 2>/dev/null || echo 0)"
+  if (( bytes > 83886080 || bytes < 128 )); then
+    echo "::warning::Encrypted archive invalid/over 80 MiB; keeping previous good backup." >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  # tar -tzf needs the encryption key; validate before replacing prior backup.
+  if ! openssl enc -d -aes-256-cbc -pbkdf2 -pass env:METODBOX_API_KEY -in "$tmp" | tar -tzf - >/dev/null 2>&1; then
+    echo "::warning::Snapshot integrity/extraction check failed; old backup retained." >&2
+    rm -f "$tmp"; return 1
+  fi
+  mv "$tmp" "$ARCHIVE_PATH"
+  git -C "$DATA_DIR" add "agent-storage/pcs/${AGENT_ID}/state.tar.gz.enc" || return 1
+  if git -C "$DATA_DIR" diff --cached --quiet; then return 0; fi
+  git -C "$DATA_DIR" config user.name "Metodbox Agent Storage"
+  git -C "$DATA_DIR" config user.email "actions@users.noreply.github.com"
+  git -C "$DATA_DIR" commit -m "storage: checkpoint ${AGENT_ID}" >/dev/null || return 1
+  if storage_push "$DATA_DIR"; then
+    echo "Encrypted PC checkpoint persisted privately (${bytes} bytes)."
+    return 0
+  fi
+  echo "::warning::Could not push snapshot to private storage. Snapshot is not durable yet." >&2
+  return 1
 }
 
 cleanup() {
@@ -141,9 +157,13 @@ cleanup() {
   if [[ -d "$WORKSPACE" && -d "$PROFILES" ]]; then
     sudo chown -R "$(id -u):$(id -g)" "$WORKSPACE" "$PROFILES" || true
   fi
-  persist_state
-  if [[ $code -eq 0 ]]; then
-    set_state "stopped" "Ajan bilgisayarı durdu. Dosyaları GitHub'a şifreli kaydedildi."
+  local saved=0
+  if persist_state; then saved=1; fi
+  if [[ $code -eq 0 && $saved -eq 1 ]]; then
+    set_state "stopped" "PC kapandı. Dosyalar özel GitHub deposuna şifreli kaydedildi."
+  elif [[ $code -eq 0 ]]; then
+    set_state "error" "PC kapandı ancak son yedek yüklenemedi; önceki yedek korundu. Actions kayıtlarını kontrol et."
+    code=12
   else
     set_state "error" "Ajan bilgisayarı beklenmedik şekilde kapandı. GitHub Actions logunu kontrol et."
   fi
@@ -213,7 +233,16 @@ echo "Agent $AGENT_ID computer ready at $TUNNEL_URL"
 # Standard GitHub-hosted jobs have a six-hour maximum. Leave time for encrypted
 # persistence and cleanup.
 END=$(( $(date +%s) + 19800 ))
+NEXT_CHECKPOINT=$(( $(date +%s) + CHECKPOINT_INTERVAL ))
 while [[ $(date +%s) -lt $END ]]; do
+  if (( $(date +%s) >= NEXT_CHECKPOINT )); then
+    if persist_state; then
+      echo "::notice::Live workspace checkpoint saved."
+    else
+      echo "::warning::Live backup failed; will retry at next checkpoint."
+    fi
+    NEXT_CHECKPOINT=$(( $(date +%s) + CHECKPOINT_INTERVAL ))
+  fi
   if [[ "$(kv_get "$STOP_KEY")" == *"1"* ]]; then
     set_state "stopping" "Kullanıcı ajan bilgisayarını durdurdu." "$TUNNEL_URL"
     exit 0
