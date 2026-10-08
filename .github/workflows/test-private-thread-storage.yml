@@ -11,6 +11,7 @@ on:
       - "github-runtime/launch-copilot-app.sh"
       - "github-runtime/setup-private-storage.sh"
       - "github-runtime/setup-termux.sh"
+      - "github-runtime/fix-secrets-termux.sh"
       - "github-runtime/tests/threadhub-storage.test.mjs"
       - "github-runtime/tests/portal-login.test.mjs"
       - "cloudflare-direct/src/portal.js"
@@ -39,5 +40,6 @@ jobs:
           bash -n github-runtime/launch-copilot-app.sh
           bash -n github-runtime/setup-private-storage.sh
           bash -n github-runtime/setup-termux.sh
+          bash -n github-runtime/fix-secrets-termux.sh
       - name: Mock GitHub API tests
         run: node --test github-runtime/tests/threadhub-storage.test.mjs github-runtime/tests/portal-login.test.mjs
