@@ -154,6 +154,24 @@ replace(
       await this.supervisor(`/computers/${id}/ensure`, {});""",
 )
 
+# The ephemeral public tunnel remains locked with OpenDots' owner token.
+# The portal places that token in the iframe URL once; the client moves it to
+# sessionStorage immediately and removes it from the address bar.
+replace(
+    "src/client/api.ts",
+    """let token = sessionStorage.getItem('opendots-token') ?? '';""",
+    """let token = sessionStorage.getItem('opendots-token') ?? '';
+
+const bootstrapToken = new URLSearchParams(location.search).get('access_token');
+if (bootstrapToken) {
+  token = bootstrapToken;
+  sessionStorage.setItem('opendots-token', bootstrapToken);
+  const clean = new URL(location.href);
+  clean.searchParams.delete('access_token');
+  history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
+}""",
+)
+
 # Restore ThreadHub history into the client agent before connecting.
 replace(
     "src/client/Chat.tsx",
