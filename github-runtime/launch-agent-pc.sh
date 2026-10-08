@@ -129,6 +129,11 @@ cleanup() {
   local code=$?
   trap - EXIT
   set +e
+  if [[ $code -ne 0 && -n "$CONTAINER" ]]; then
+    echo '::error::Agent PC container exited prematurely. Capturing diagnostics:' >&2
+    docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.State.Error}}' "$CONTAINER" >&2 || true
+    docker logs --tail 120 "$CONTAINER" >&2 || true
+  fi
   [[ -n "$CONTAINER" ]] && docker stop -t 20 "$CONTAINER" >/dev/null 2>&1 || true
   [[ -n "$CONTAINER" ]] && docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   [[ -n "$TUNNEL_PID" ]] && kill "$TUNNEL_PID" >/dev/null 2>&1 || true
@@ -157,14 +162,15 @@ COMPUTER_TOKEN="$(derive_computer_token)"
 CONTAINER="metodbox-agentpc-${AGENT_ID}"
 
 set_state "starting" "Ajan için izole Chromium, terminal ve workspace başlatılıyor."
-docker run -d --rm   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
+docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
 
 for _ in $(seq 1 120); do
   if curl -fsS --max-time 3 http://127.0.0.1:4100/health >/dev/null 2>&1; then
     break
   fi
   if ! docker inspect "$CONTAINER" >/dev/null 2>&1; then
-    docker logs "$CONTAINER" >&2 || true
+    docker inspect --format '{{.State.Status}} {{.State.ExitCode}} {{.State.Error}}' "$CONTAINER" >&2 || true
+    docker logs --tail 120 "$CONTAINER" >&2 || true
     exit 7
   fi
   sleep 1
