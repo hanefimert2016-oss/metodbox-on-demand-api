@@ -137,6 +137,10 @@ cleanup() {
   [[ -n "$CONTAINER" ]] && docker stop -t 20 "$CONTAINER" >/dev/null 2>&1 || true
   [[ -n "$CONTAINER" ]] && docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   [[ -n "$TUNNEL_PID" ]] && kill "$TUNNEL_PID" >/dev/null 2>&1 || true
+  # Host runner must regain access to browser profiles for encrypted backup.
+  if [[ -d "$WORKSPACE" && -d "$PROFILES" ]]; then
+    sudo chown -R "$(id -u):$(id -g)" "$WORKSPACE" "$PROFILES" || true
+  fi
   persist_state
   if [[ $code -eq 0 ]]; then
     set_state "stopped" "Ajan bilgisayarı durdu. Dosyaları GitHub'a şifreli kaydedildi."
@@ -162,6 +166,11 @@ COMPUTER_TOKEN="$(derive_computer_token)"
 CONTAINER="metodbox-agentpc-${AGENT_ID}"
 
 set_state "starting" "Ajan için izole Chromium, terminal ve workspace başlatılıyor."
+# --cap-drop ALL removes root's DAC_OVERRIDE. Give the container's uid=0
+# ownership of ONLY the two dedicated bind-mount roots before starting it.
+# Never globally chmod 777: browser profiles may hold login credentials.
+sudo chown -R 0:0 "$WORKSPACE" "$PROFILES"
+sudo chmod u+rwx "$WORKSPACE" "$PROFILES"
 docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
 
 for _ in $(seq 1 120); do
