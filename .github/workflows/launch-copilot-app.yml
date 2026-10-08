@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   launch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 350
     env:
       APP: ${{ github.event.client_payload.app || inputs.app }}
@@ -48,5 +48,15 @@ jobs:
       - name: Install launcher dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Restore prebuilt OpenDots (skip install + compile when cached)
+        if: env.APP == 'opendots'
+        id: opendots_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/opendots
+          key: opendots-built-ubuntu24-node24-625452e0-${{ hashFiles('github-runtime/patch-opendots.py', 'github-runtime/opendots-threadhub.ts', 'github-runtime/opendots-overlay/**') }}
+
       - name: Launch selected app
+        env:
+          OPENDOTS_CACHE_HIT: ${{ steps.opendots_cache.outputs.cache-hit }}
         run: bash github-runtime/launch-copilot-app.sh "$APP"
