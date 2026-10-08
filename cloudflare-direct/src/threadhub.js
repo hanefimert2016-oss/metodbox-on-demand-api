@@ -447,6 +447,7 @@ export async function saveRoster(env,chatId,roster) {
       report:String(x.report||"").slice(0,8000),createdAt:Number(x.createdAt)||Date.now(),
       updatedAt:Number(x.updatedAt)||Date.now()
     })),
+    allowExec:roster.allowExec===true,
     createdAt:Number(roster.createdAt)||Date.now(),updatedAt:Date.now()
   };
   let last;
