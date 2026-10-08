@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handleThreadHubRequest } from "../../cloudflare-direct/src/threadhub.js";
 
-const PRIVATE = "hanefimert2016-oss/ai-application-suite-1";
+const PRIVATE = "hanefimert2016-oss/Metodbox-secret-system";
 const PUBLIC = "hanefimert2016-oss/metodbox-on-demand-api";
 const environment = () => {
   const kv = new Map();
@@ -36,6 +36,9 @@ test("private repo handles encrypted thread writes, not public repo", async () =
   const requests = [];
   globalThis.fetch = async (url, init = {}) => {
     requests.push({ url: String(url), init });
+    if (String(url) === "https://api.github.com/repos/" + PRIVATE) {
+      return Response.json({ full_name: PRIVATE, private: true });
+    }
     if (init.method === "PUT") {
       return new Response(JSON.stringify({ content: { sha: "saved" } }), { status: 201 });
     }
@@ -50,7 +53,7 @@ test("private repo handles encrypted thread writes, not public repo", async () =
     const output = await resp.json();
     assert.equal(output.agentId, "coder");
     assert.ok(requests.some(x => x.init.method === "PUT"));
-    assert.ok(requests.every(x => x.url.includes("/repos/" + PRIVATE + "/")));
+    assert.ok(requests.every(x => x.url === "https://api.github.com/repos/" + PRIVATE || x.url.includes("/repos/" + PRIVATE + "/")));
     assert.ok(requests.every(x => x.init.headers.Authorization === "Bearer private-storage-token"));
   } finally {
     globalThis.fetch = original;
@@ -87,4 +90,26 @@ test("API key is mandatory", async () => {
     new Request("https://worker.example" + p), env, new URL("https://worker.example" + p)
   );
   assert.equal(response.status, 401);
+});
+
+test("refuses to write ANY thread data when storage repo is public", async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({url: String(url), method: init?.method || "GET"});
+    return Response.json({ full_name: PRIVATE, private: false });
+  };
+  try {
+    const env = environment();
+    env.GITHUB_STORAGE_TOKEN = "a-distinct-token-for-public-repo-check";
+    const endpoint = "/api/threadhub/threads";
+    const response = await handleThreadHubRequest(
+      request("POST", endpoint, { title: "Should fail" }),
+      env, new URL("https://worker.example" + endpoint)
+    );
+    assert.equal(response.status, 503);
+    assert.equal(calls.some(x => x.method === "PUT"), false);
+  } finally {
+    globalThis.fetch = original;
+  }
 });
