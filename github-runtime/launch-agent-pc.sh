@@ -234,7 +234,13 @@ echo "Agent $AGENT_ID computer ready at $TUNNEL_URL"
 # persistence and cleanup.
 END=$(( $(date +%s) + 19800 ))
 NEXT_CHECKPOINT=$(( $(date +%s) + CHECKPOINT_INTERVAL ))
+NEXT_HEARTBEAT=$(( $(date +%s) + 180 ))
 while [[ $(date +%s) -lt $END ]]; do
+  if (( $(date +%s) >= NEXT_HEARTBEAT )); then
+    # Heartbeats prevent stale status after unexpected GitHub job termination.
+    set_state "running" "PC açık: tarayıcı, terminal ve çalışma alanı erişilebilir." "$TUNNEL_URL" || true
+    NEXT_HEARTBEAT=$(( $(date +%s) + 180 ))
+  fi
   if (( $(date +%s) >= NEXT_CHECKPOINT )); then
     if persist_state; then
       echo "::notice::Live workspace checkpoint saved."
