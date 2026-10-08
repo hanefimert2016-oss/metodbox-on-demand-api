@@ -1,0 +1,78 @@
+name: Test Native Dot PC End-to-End
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-native-dot-pc.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    env:
+      PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Start real PC through Dot Worker, navigate, screenshot, stop
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          const base="https://metodbox-direct-api.hanefimert2016.workers.dev";
+          const login=await fetch(base+"/apps/login",{
+            method:"POST",headers:{Origin:base,"Content-Type":"application/x-www-form-urlencoded"},
+            body:new URLSearchParams({username:"admin",password:process.env.PORTAL_PASSWORD||""}),
+            redirect:"manual",signal:AbortSignal.timeout(30000)
+          });
+          if(login.status!==303)throw Error("Login failed: HTTP "+login.status);
+          const cookie=login.headers.get("set-cookie")?.split(";")[0];
+          if(!cookie)throw Error("No cookie");
+          async function api(route,method="GET",body,timeout=30000){
+            const response=await fetch(base+"/dot/api/"+route,{
+              method,headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
+              ...(body?{body:JSON.stringify(body)}:{}),
+              signal:AbortSignal.timeout(timeout)
+            });
+            const json=await response.json().catch(()=>({}));
+            if(!response.ok)throw Error(route+" HTTP "+response.status+": "+String(json.error||"").slice(0,300));
+            return json;
+          }
+          let started=false;
+          try {
+            const pre=await api("pc/status");
+            if(pre.status==="running")throw Error("Dot PC already running; not overwriting existing user session");
+            const start=await api("pc/start","POST",{});
+            started=true;
+            console.log("Agent PC requested:",start.status);
+            let state;
+            for(let i=0;i<54;i++){
+              await new Promise(resolve=>setTimeout(resolve,5000));
+              state=await api("pc/status");
+              if(i%6===0)console.log("Dot PC startup:",state.status,String(state.message||"").slice(0,70));
+              if(state.status==="running")break;
+              if(state.status==="error")throw Error("Agent PC failed: "+String(state.message||"").slice(0,200));
+            }
+            if(state?.status!=="running")throw Error("Agent PC did not become ready");
+            console.log("Dot PC started via Cloudflare + GitHub dispatch.");
+            const page=await api("pc/navigate","POST",{url:"https://example.org"},35000);
+            if(!String(page.url||"").includes("example.org"))throw Error("Navigation did not reach expected site");
+            console.log("Dot PC remote browser navigation OK, title length:",String(page.title||"").length);
+            const shot=await api("pc/screenshot","POST",{},35000);
+            if(typeof shot.base64!=="string"||shot.base64.length<500)
+              throw Error("Dot PC did not return screenshot bytes");
+            console.log("Dot PC remote screenshot OK, base64 bytes:",shot.base64.length);
+          }finally{
+            if(started){
+              try{
+                const stopped=await api("pc/stop","POST",{});
+                console.log("PC shutdown requested:",stopped.status);
+              }catch(e){console.error("PC cleanup stop failed:",e.message)}
+            }
+          }
+          JS
