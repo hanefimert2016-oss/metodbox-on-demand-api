@@ -82,9 +82,9 @@ test("new Dot UI loads instantly from Worker, cookie covers /dot",async()=>{
   assert.equal(res.status,200);
   const html=await res.text();
   assert.ok(html.includes("Metodbox Dot"));
-  assert.ok(html.includes("voiceButton"));
+  assert.ok(html.includes("callBtn"));
   assert.ok(html.includes("pcStart"));
-  assert.ok(html.includes("Edge neural"));
+  assert.ok(html.includes("Neural Türkçe"));
   assert.ok(!html.includes("test-model-key"));
   assert.ok(!html.includes("OPENAI_API_KEY"));
 });
