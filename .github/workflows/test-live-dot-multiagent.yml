@@ -1,0 +1,84 @@
+name: Test Live Dot Multi-Agent and PC Isolation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-live-dot-multiagent.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    env:
+      PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+    steps:
+      - name: Verify real independent chats and parallel children via Cloudflare
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          const base="https://metodbox-direct-api.hanefimert2016.workers.dev";
+          const envPassword=process.env.PORTAL_PASSWORD;
+          if(!envPassword)throw Error('Missing portal secret');
+          const login=await fetch(base+"/apps/login",{method:"POST",redirect:"manual",
+            headers:{Origin:base,"Content-Type":"application/x-www-form-urlencoded"},
+            body:new URLSearchParams({username:"admin",password:envPassword,return_to:"/dot"}),
+            signal:AbortSignal.timeout(30000)});
+          if(login.status!==303||login.headers.get("Location")!=="/dot")throw Error('Android /dot login failed');
+          const cookie=login.headers.get("set-cookie")?.split(";")[0];
+          const api=async (path,method="GET",body,timeout=150000)=>{
+            const r=await fetch(base+"/dot/api/"+path,{method,
+              headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
+              ...(body?{body:JSON.stringify(body)}:{}),
+              signal:AbortSignal.timeout(timeout)});
+            const data=await r.json().catch(()=>({}));
+            if(!r.ok)throw Error(path+" HTTP "+r.status+": "+String(data.error||"").slice(0,200));
+            return data;
+          };
+          const chats=[],pcs=new Set();
+          try{
+            for(const name of ["Alpha","Beta"]){
+              const c=await api("threads","POST",{title:"CI "+name});
+              chats.push(c.id);
+              if(c.pc?.status==="error")throw Error("Main PC launch failed: "+c.pc.message);
+              console.log(name,"main PC dispatched",c.id);
+              pcs.add("ch-"+c.id);
+            }
+            if(chats[0]===chats[1])throw Error("Chats share same ID");
+            const chatId=chats[0];
+            const a=await api("chats/"+chatId+"/agents","POST",{agents:[
+              {name:"Araştırmacı",task:"Türkçe tek cümle ile araştırmanın neden önemli olduğunu açıkla. PC kullanma."},
+              {name:"Kodlayıcı",task:"Türkçe tek cümle ile testin neden önemli olduğunu açıkla. PC kullanma."}
+            ]});
+            if(a.agents.length!==2)throw Error("Expected two child agents");
+            const ids=a.agents.map(x=>x.id);ids.forEach(id=>pcs.add(id));
+            if(ids[0]===ids[1])throw Error("Child PC identifiers collide");
+            console.log("Independent PCs dispatched for children.");
+            const roster=await api("chats/"+chatId+"/agents");
+            if(roster.agents.length!==2)throw Error("Encrypted roster does not persist");
+            const task=await api("chats/"+chatId+"/agents/run","POST",{agentIds:ids},160000);
+            if(task.reports.length!==2)throw Error("Expected parallel responses");
+            if(task.reports.some(x=>!x.report?.trim()))throw Error("A child did not answer: "+JSON.stringify(task.reports));
+            console.log("Two concurrent GPT+ child tasks returned reports.");
+            const rejected=await fetch(base+"/dot/api/pc/status?chatId="+chats[1]+"&agentId="+ids[0],{
+              headers:{Cookie:cookie,Origin:base},signal:AbortSignal.timeout(30000)});
+            if(rejected.status===200)throw Error("Cross-chat PC access allowed");
+            console.log("Cross-chat PC isolation OK.");
+          } finally {
+            for(const id of pcs) {
+              try{
+                const chatId=id.startsWith("ch-"+chats[0])?chats[0]:chats[1];
+                await api("pc/stop","POST",{chatId,agentId:id},30000);
+                console.log("Stop requested for",id);
+              }catch(e){console.log("PC shutdown warning:",e.message)}
+            }
+            for(const id of chats) {
+              try{await api("threads/"+id,"DELETE",null,30000);console.log("Test chat deleted:",id)}
+              catch(e){console.log("Chat cleanup warning:",e.message)}
+            }
+          }
+          JS
