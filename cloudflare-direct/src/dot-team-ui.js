@@ -13,7 +13,8 @@ header{display:flex;justify-content:space-between;align-items:center;padding:15p
 <section class="panel"><h2>◈ Agent Ekibi</h2><div class="notice">Her sohbet için 1 ana PC, her alt agent için ayrı GitHub Actions PC ve şifreli kalıcı çalışma alanı. İstekler aynı GPT+ API'sine eşzamanlı gönderilebilir.</div>
 <div id="roster"><div class="muted">Agentlar yükleniyor…</div></div>
 <div class="sec">Yeni alt agent</div><div class="form"><input id="agentName" maxlength="80" placeholder="Ör. Araştırmacı"><textarea id="agentTask" maxlength="2000" placeholder="Ör. X projesindeki güncel kütüphaneleri araştır, sonuçları raporla."></textarea>
-<div class="actions"><button id="addAgent" class="primary">＋ Oluştur ve PC aç</button><button id="runSelected">▶ Seçilen agentları paralel çalıştır</button></div></div>
+<div class="actions"><button id="addAgent" class="primary">＋ Oluştur ve PC aç</button><button id="runSelected">▶ Seçilen agentları paralel çalıştır</button><button id="cancelWait" disabled>Beklemeyi iptal et</button></div>
+<label class="check"><input type="checkbox" id="waitForPc" checked> Gerçek PC gerektiren görevlerde agent PC'leri hazır olana kadar bekle</label></div>
 <label class="check"><input type="checkbox" id="shellGrant"> Alt agentlara terminal komutu çalıştırma izni ver</label>
 <p class="subtitle">Terminal için güçlü portal şifresi ve ayrıca izin gerekir. Aynı anda en fazla 3 bağımsız agent/model isteği, bir sohbette en fazla 6 alt agent.</p>
 <div id="result" class="report">Görev sonuçları ve hatalar burada gösterilir.</div>
@@ -69,13 +70,53 @@ $('addAgent').disabled=true;status('Yeni PC isteniyor…');
 try{const r=await api('chats/'+chatId+'/agents','POST',{name:$('agentName').value.trim()||'Alt Agent',task});$('agentTask').value='';output(r.agents.map(x=>x.name+' için ayrı PC: '+(x.pc?.status||'requested')).join('\\n'));await refresh()}
 catch(e){output('Agent oluşturma hatası: '+e.message)}finally{$('addAgent').disabled=false}
 }
-async function runAgents(ids){
-if(!ids.length){output('Paralel çalıştırmak için alt agent seç.');return}
-if(ids.length>3){output('Tek turda en fazla 3 paralel agent.');return}
-$('runSelected').disabled=true;status('Paralel model çağrıları…');output(ids.length+' alt agent GPT+ üzerinden eşzamanlı çalışıyor…');
-try{const r=await api('chats/'+chatId+'/agents/run','POST',{agentIds:ids});output(r.reports.map(x=>x.id+'\\n'+(x.report||x.error||'Sonuç yok')).join('\\n\\n'));await refresh()}
-catch(e){output('Paralel agent hatası: '+e.message)}finally{$('runSelected').disabled=false}
+let cancelledWait=false;
+async function waitUntilComputersReady(ids){
+  cancelledWait=false;
+  $('cancelWait').disabled=false;
+  try{
+    const initial=await api('chats/'+chatId+'/agents');
+    const statuses=new Map(initial.agents.map(a=>[a.id,a.pc?.status||'stopped']));
+    // Restore stopped/stale PCs, but never interrupt a PC already stopping.
+    const stopped=ids.filter(id=>['stopped','stale','error'].includes(statuses.get(id)));
+    if(stopped.length){
+      const dispatch=await Promise.allSettled(stopped.map(agentId=>api('pc/start','POST',{chatId,agentId})));
+      const failed=dispatch.filter(x=>x.status==='rejected');
+      if(failed.length)throw Error('PC başlangıç hatası: '+failed.map(x=>x.reason.message).join('; '));
+    }
+    const until=Date.now()+3*60*1000;
+    while(Date.now()<until){
+      if(cancelledWait)throw Error('Bekleme iptal edildi. PC ve agent verileri korunuyor.');
+      const data=await api('chats/'+chatId+'/agents');
+      const selected=ids.map(id=>data.agents.find(a=>a.id===id));
+      if(selected.some(a=>!a))throw Error('Seçilen agent artık mevcut değil.');
+      const failed=selected.filter(a=>a.pc?.status==='error');
+      if(failed.length)throw Error('PC hatası: '+failed.map(a=>a.name+' · '+(a.pc.message||'Başlatılamadı')).join('; '));
+      const waiting=selected.filter(a=>a.pc?.status!=='running');
+      if(!waiting.length)return;
+      status('PC bekleniyor: '+waiting.length+'/'+ids.length);
+      output('GitHub bilgisayarları hazırlanıyor…\\n'+waiting.map(a=>a.name+' · '+(a.pc?.status||'stopped')).join('\\n')+
+        '\\n\\nPC hazır olunca görevler otomatik ve paralel başlayacak. İstersen beklemeyi iptal et.');
+      await new Promise(resolve=>setTimeout(resolve,5000));
+    }
+    throw Error('PC 3 dakika içinde hazır olmadı. Daha sonra tekrar deneyebilir ya da PC beklemeden model görevini çalıştırabilirsin.');
+  }finally{$('cancelWait').disabled=true}
 }
+async function runAgents(ids){
+  if(!ids.length){output('Paralel çalıştırmak için alt agent seç.');return}
+  if(ids.length>3){output('Tek turda en fazla 3 paralel agent.');return}
+  $('runSelected').disabled=true;
+  try{
+    if($('waitForPc').checked)await waitUntilComputersReady(ids);
+    status('Paralel model çağrıları…');
+    output(ids.length+' bağımsız agent GPT+ modelinden eşzamanlı yanıt alıyor…');
+    const r=await api('chats/'+chatId+'/agents/run','POST',{agentIds:ids});
+    output(r.reports.map(x=>x.id+'\\n'+(x.report||x.error||'Sonuç yok')).join('\\n\\n'));
+    await refresh();
+  }catch(e){status('Agent bekliyor / hata');output(e.message)}
+  finally{$('runSelected').disabled=false}
+}
+$('cancelWait').onclick=()=>{cancelledWait=true};
 $('addAgent').onclick=addAgent;
 $('runSelected').onclick=()=>runAgents(Array.from(document.querySelectorAll('input[data-agent]:checked')).map(x=>x.dataset.agent));
 $('shellGrant').onchange=async()=>{const allow=$('shellGrant').checked;if(allow&&!confirm('Bu sohbetin alt agentlarına terminal komutları çalıştırma izni verilsin mi?')){$('shellGrant').checked=false;return}
