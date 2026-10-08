@@ -25,6 +25,18 @@ if ! gh auth status >/dev/null 2>&1; then
   exit 1
 fi
 
+# GitHub's API lists secret names but NEVER returns secret values.
+# A secret may have been created with an empty string, even if its name exists.
+if [[ "${1:-}" == "--reset-session" ]]; then
+  echo "PORTAL_SESSION_SECRET yeniden üretilecek (varsa eski oturumları kapatır)."
+  openssl rand -hex 32 | tr -d '\\n' | gh secret set PORTAL_SESSION_SECRET --repo "$REPO" --app actions
+  echo "✔ PORTAL_SESSION_SECRET rastgele bir değerle yeniden ayarlandı."
+  echo
+elif [[ -n "${1:-}" ]]; then
+  echo "Kullanım: bash ~/fix-secrets.sh [--reset-session]" >&2
+  exit 2
+fi
+
 echo "Repo: $REPO"
 existing="$(gh secret list --repo "$REPO" --app actions --json name --jq '.[].name')"
 for key in PORTAL_SESSION_SECRET STORAGE_ENCRYPTION_KEY; do
@@ -42,7 +54,7 @@ echo
 echo "GitHub Secret isimleri kontrol ediliyor (değerler gösterilmez):"
 for key in PORTAL_SESSION_SECRET STORAGE_ENCRYPTION_KEY; do
   if gh secret list --repo "$REPO" --app actions --json name --jq '.[].name' | grep -Fxq "$key"; then
-    echo "✔ $key doğrulandı"
+    echo "✔ $key adı mevcut (GitHub API değerinin dolu olup olmadığını göstermez)"
   else
     echo "HATA: $key yüklenemedi" >&2
     exit 1
@@ -52,3 +64,5 @@ done
 echo
 echo "Yeniden çalıştır:"
 echo "https://github.com/$REPO/actions/workflows/configure-private-storage.yml"
+echo "ÖNEMLİ: Workflow PORTAL_SESSION_SECRET boş derse, adının var olması yeterli değildir."
+echo "Onarmak için: bash ~/fix-secrets.sh --reset-session"
