@@ -42,7 +42,18 @@ function stubGithub(){
     if(u.pathname.includes("/contents/")){
       const name=u.pathname.slice(u.pathname.indexOf("/contents/")+10);
       if(method==="GET")return saved.has(name)?Response.json(saved.get(name)):Response.json({message:"Not Found"},{status:404});
-      if(method==="PUT"){const d=JSON.parse(options.body);const sha="sha-"+crypto.randomUUID();saved.set(name,{sha,content:d.content});return Response.json({content:{sha}},{status:201})}
+      if(method==="PUT"){
+        const d=JSON.parse(options.body);
+        // Simulate GitHub Contents API optimistic SHA requirements and create
+        // a race window where two agent creation requests read the same roster.
+        if(name.includes("/rosters/"))await new Promise(r=>setTimeout(r,12));
+        const previous=saved.get(name);
+        if((previous&&d.sha!==previous.sha)||(!previous&&d.sha))
+          return Response.json({message:"SHA mismatch"},{status:409});
+        const sha="sha-"+crypto.randomUUID();
+        saved.set(name,{sha,content:d.content});
+        return Response.json({content:{sha}},{status:201});
+      }
       if(method==="DELETE"){saved.delete(name);return Response.json({})}
     }
     return Response.json({message:"Mock endpoint not implemented"},{status:500});
@@ -104,4 +115,52 @@ test("each chat gets its own main PC; children are isolated; two model requests 
     const states=await invoke(env,cookie,"GET","/dot/api/pc/status?chatId="+a.data.id);
     assert.equal(states.response.status,200);
   }finally{globalThis.fetch=original}
+});
+
+// Concurrent sessions must not choose the same a1 ID or overwrite prior agent
+// entries. GitHub 409 retries need to reread and recalculate the roster.
+test("simultaneous child creation retries real GitHub SHA conflicts without losing an agent",async()=>{
+  const stub=stubGithub(),old=globalThis.fetch;
+  globalThis.fetch=stub.fetch;
+  try{
+    const env=environment(),cookie=await login(env);
+    const made=await invoke(env,cookie,"POST","/dot/api/threads",{title:"Çakışma testi"});
+    assert.equal(made.response.status,201);
+    const path="/dot/api/chats/"+made.data.id+"/agents";
+    const [a,b]=await Promise.all([
+      invoke(env,cookie,"POST",path,{name:"Birinci",task:"A görevini yap"}),
+      invoke(env,cookie,"POST",path,{name:"İkinci",task:"B görevini yap"})
+    ]);
+    assert.equal(a.response.status,201,JSON.stringify(a.data));
+    assert.equal(b.response.status,201,JSON.stringify(b.data));
+    const ids=[a.data.agents[0].id,b.data.agents[0].id];
+    assert.notEqual(ids[0],ids[1]);
+    const read=await invoke(env,cookie,"GET",path);
+    assert.equal(read.response.status,200);
+    assert.equal(read.data.agents.length,2);
+    assert.deepEqual(new Set(read.data.agents.map(v=>v.name)),new Set(["Birinci","İkinci"]));
+  }finally{globalThis.fetch=old}
+});
+
+test("stale PC tunnel can be restarted and receives a fresh dispatch",async()=>{
+  const stub=stubGithub(),old=globalThis.fetch;
+  globalThis.fetch=stub.fetch;
+  try{
+    const env=environment(),cookie=await login(env);
+    const made=await invoke(env,cookie,"POST","/dot/api/threads",{title:"Eski PC"});
+    assert.equal(made.response.status,201);
+    const pcid="ch-"+made.data.id;
+    await env.AUTH_KV.put("agent_pc:"+pcid,JSON.stringify({
+      agentId:pcid,status:"running",url:"https://old.trycloudflare.com",
+      updated_at:Date.now()-20*60*1000
+    }));
+    const status=await invoke(env,cookie,"GET","/dot/api/pc/status?chatId="+made.data.id);
+    assert.equal(status.data.status,"stale");
+    const previous=stub.calls.filter(c=>c.url.endsWith("/dispatches")).length;
+    const restarted=await invoke(env,cookie,"POST","/dot/api/pc/start",{chatId:made.data.id,agentId:"main"});
+    assert.equal(restarted.response.status,200,JSON.stringify(restarted.data));
+    const current=stub.calls.filter(c=>c.url.endsWith("/dispatches"));
+    assert.equal(current.length,previous+1);
+    assert.equal(JSON.parse(current.at(-1).body).client_payload.agent_id,pcid);
+  }finally{globalThis.fetch=old}
 });
