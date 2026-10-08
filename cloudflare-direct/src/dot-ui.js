@@ -20,7 +20,7 @@ header{padding:12px 18px;border-bottom:1px solid var(--edge);display:flex;justif
 <main><header><div class="actions"><button id="mobileMenu">☰</button><span class="brand">✦ Dot</span><span class="note" id="status">Hazır</span></div><div class="actions"><button id="voiceButton" class="primary">☎ Ara</button><button id="pcButton">▣ PC</button></div></header>
 <div id="messages"><div class="bubble"><span class="who">Dot</span>Merhaba! Ben Metodbox Dot. Mesaj yazabilir, ☎ Ara ile konuşabilir veya PC'yi açabilirsin.</div></div><div id="composer"><textarea id="input" placeholder="Dot'a mesaj gönder…" rows="1"></textarea><button id="sendButton" class="primary">➤</button></div></main></div>
 <div id="pcPanel"><div class="actions" style="justify-content:space-between"><strong>Dot'un bulut bilgisayarı</strong><button id="pcClose">✕</button></div><p class="note" id="pcStatus">Henüz başlatılmadı.</p><div class="actions"><button id="pcStart" class="primary">PC Başlat</button><button id="pcStop">Durdur</button><button id="pcRefresh">Yenile</button></div><h3>Tarayıcı</h3><input id="pcUrl" value="https://example.org" placeholder="https://"><button id="pcNavigate">Web sitesini aç</button> <button id="pcScreenshot">Ekran görüntüsü</button><img id="pcShot" alt="PC tarayıcı görüntüsü"><h3>Terminal</h3><input id="pcCommand" placeholder="örn. pwd"><button id="pcExec">Komutu çalıştır</button><p class="note">Terminal komutunu onayladıktan sonra izole GitHub PC'de çalıştırır.</p><pre id="pcOutput"></pre></div>
-<div id="call"><div class="note">METODBOX · SESLİ GÖRÜŞME</div><div id="callOrb">✦</div><h2>Dot ile konuş</h2><div id="callStatus" class="note">Mikrofon hazırlanıyor…</div><div id="callCaption">Seni dinliyorum.</div><div class="callbuttons"><button id="callMute">🎙 Mikrofonu kapat</button><button id="callEnd" style="background:#9e293a">☎ Görüşmeyi bitir</button></div><p class="note">Normal telefon hattı değil; tarayıcı üzerinden konuşmadır.</p></div>
+<div id="call"><div class="note">METODBOX · SESLİ GÖRÜŞME</div><div id="callOrb">✦</div><h2>Dot ile konuş</h2><div id="callStatus" class="note">Mikrofon hazırlanıyor…</div><div id="callCaption">Seni dinliyorum.</div><div class="callbuttons"><button id="callMute">🎙 Mikrofonu kapat</button><button id="callEnd" style="background:#9e293a">☎ Görüşmeyi bitir</button></div><p class="note">Normal telefon hattı değil · Neural ses için konuşma metni Microsoft'a iletilebilir; servis kapalıysa cihaz sesi kullanılır.</p></div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);const state={thread:null,threads:[],busy:false,calling:false,muted:false,speaking:false,recognizer:null,listening:false};
@@ -37,9 +37,47 @@ if(!state.thread){try{const t=await send('threads','POST',{title:text.slice(0,55
 bubble('user',text);setStatus('Dot düşünüyor…');if(state.calling)$('callStatus').textContent='Yanıt hazırlanıyor…';
 try{const reply=await send('message','POST',{threadId:state.thread,text});if(reply.content)bubble('assistant',reply.content);setStatus(reply.saved===false?'Yanıt geldi ama geçmiş kaydedilemedi':'Hazır');if(state.calling&&reply.content){$('callCaption').textContent=reply.content.slice(0,400);await speak(reply.content)}}catch(e){bubble('assistant','Yanıt alınamadı: '+e.message);setStatus('Bağlantı hatası')}finally{state.busy=false;$('sendButton').disabled=false;await threads();if(state.calling&&!state.muted&&!state.speaking)listen()}}
 $('sendButton').onclick=say;$('input').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();say()}};$('newThread').onclick=create;$('mobileMenu').onclick=()=>$('sidebar').classList.toggle('open');
-function speak(text){return new Promise(resolve=>{if(!state.calling||!('speechSynthesis' in window)){resolve();return}state.speaking=true;const u=new SpeechSynthesisUtterance(String(text).replace(/[\*_#]/g,'').slice(0,850));u.lang='tr-TR';u.rate=1.06;const opts=speechSynthesis.getVoices()||[];u.voice=opts.find(x=>/tr[-_]TR/i.test(x.lang)&&/google|natural|neural|microsoft/i.test(x.name))||opts.find(x=>/tr[-_]TR/i.test(x.lang))||null;let settled=false;const done=()=>{if(settled)return;settled=true;state.speaking=false;resolve()};u.onend=done;u.onerror=done;speechSynthesis.cancel();speechSynthesis.speak(u);setTimeout(done,25000)})}
+async function speak(text){
+  if(!state.calling)return;
+  state.speaking=true;
+  const input=String(text).replace(/[\*_#]/g,'').slice(0,850);
+  // Prefer remote neural voice; download audio bytes only (no large model/RAM).
+  // The unofficial Edge endpoint can fail. Always offer native device TTS.
+  try{
+    $('callStatus').textContent='Neural ses hazırlanıyor…';
+    const response=await fetch('/dot/api/tts',{method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:input,voice:'tr-TR-EmelNeural'}),
+      signal:AbortSignal.timeout(17000)});
+    if(!response.ok)throw Error('Neural TTS HTTP '+response.status);
+    const blob=await response.blob();
+    if(blob.size<500||!response.headers.get('content-type')?.includes('audio/'))throw Error('Neural TTS audio yok');
+    if(!state.calling)return;
+    const url=URL.createObjectURL(blob), audio=new Audio(url);
+    state.audio=audio;
+    $('callStatus').textContent='Dot konuşuyor · Edge neural';
+    try{
+      await new Promise((resolve,reject)=>{audio.onended=resolve;audio.onerror=()=>reject(Error('Audio error'));audio.play().catch(reject)});
+      return;
+    }finally{state.audio=null;URL.revokeObjectURL(url)}
+  }catch(error){
+    if(!state.calling)return;
+    $('callStatus').textContent='Telefonun Türkçe sesi kullanılıyor.';
+    await deviceSpeak(input);
+  }finally{state.speaking=false}
+}
+function deviceSpeak(text){return new Promise(resolve=>{
+  if(!state.calling||!('speechSynthesis' in window)){resolve();return}
+  const u=new SpeechSynthesisUtterance(text);u.lang='tr-TR';u.rate=1.05;
+  const voices=speechSynthesis.getVoices()||[];
+  u.voice=voices.find(v=>/tr[-_]TR/i.test(v.lang)&&/google|natural|neural|microsoft/i.test(v.name))||
+    voices.find(v=>/tr[-_]TR/i.test(v.lang))||null;
+  let finished=false;const done=()=>{if(finished)return;finished=true;resolve()};
+  u.onend=done;u.onerror=done;speechSynthesis.cancel();speechSynthesis.speak(u);
+  setTimeout(done,25000);
+})}
 function listen(){if(!state.calling||state.muted||state.speaking||state.listening)return;const API=window.SpeechRecognition||window.webkitSpeechRecognition;if(!API){$('callStatus').textContent='Konuşma tanıma desteklenmiyor. Metin kutusunu kullan.';return}const sr=new API();state.recognizer=sr;sr.lang='tr-TR';sr.interimResults=true;sr.continuous=false;let final='';sr.onstart=()=>{state.listening=true;$('callStatus').textContent='🎙 Dinliyorum…'};sr.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const part=e.results[i][0].transcript;if(e.results[i].isFinal)final+=part;else $('callCaption').textContent=part}if(final)$('callCaption').textContent=final};sr.onerror=e=>{state.listening=false;$('callStatus').textContent='Mikrofon: '+e.error};sr.onend=()=>{state.listening=false;state.recognizer=null;if(final.trim()&&state.calling&&!state.muted){ask(final.trim());return}if(state.calling&&!state.muted&&!state.speaking)setTimeout(listen,900)};try{sr.start()}catch(e){$('callStatus').textContent=e.message}}
-function endCall(){state.calling=false;state.recognizer?.abort();state.listening=false;if('speechSynthesis' in window)speechSynthesis.cancel();state.speaking=false;$('call').classList.remove('open')}
+function endCall(){state.calling=false;state.recognizer?.abort();state.listening=false;if(state.audio){state.audio.pause();state.audio=null}if('speechSynthesis' in window)speechSynthesis.cancel();state.speaking=false;$('call').classList.remove('open')}
 $('voiceButton').onclick=()=>{state.calling=true;state.muted=false;$('call').classList.add('open');$('callCaption').textContent='Merhaba! Konuşmaya başlayabilirsin.';listen()};$('callEnd').onclick=endCall;
 $('callMute').onclick=()=>{state.muted=!state.muted;$('callMute').textContent=state.muted?'🎙 Mikrofonu aç':'🎙 Mikrofonu kapat';if(state.muted)state.recognizer?.abort();else listen()};
 $('pcButton').onclick=()=>{$('pcPanel').classList.toggle('open');pcStatus()};$('pcClose').onclick=()=>$('pcPanel').classList.remove('open');
