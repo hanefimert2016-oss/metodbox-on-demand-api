@@ -408,14 +408,51 @@ export async function putThread(env, id, input = {}) {
   throw last || new Error("Thread güncellenemedi");
 }
 
+// Atomically append one or several assistant/user messages to a thread.
+// Unlike putThread(messages=[...old,...new]), concurrent conversations cannot
+// overwrite replies that another request persisted in the meantime.
+export async function appendThreadMessages(env,id,messages,options={}){
+  const threadId=safeId(id,"thread id");
+  if(!Array.isArray(messages)||!messages.length||messages.length>16)
+    throw new Error("Invalid message batch");
+  const additions=normalizeMessages(messages);
+  let last;
+  for(let attempt=0;attempt<7;attempt++){
+    const current=await readEncrypted(env,threadPath(threadId),null);
+    if(!current.value)throw new Error("Thread bulunamadı");
+    const present=new Set((current.value.messages||[]).map(m=>m.id));
+    const fresh=additions.filter(m=>!present.has(m.id));
+    if(!fresh.length)return current.value;
+    const next={
+      ...current.value,
+      updatedAt:Date.now(),
+      title:current.value.title==="Yeni konuşma"&&options.title
+        ?String(options.title).slice(0,160):current.value.title,
+      messages:normalizeMessages([...(current.value.messages||[]),...fresh])
+    };
+    try{
+      await writeEncrypted(env,threadPath(threadId),next,current.sha,"threadhub: append "+threadId);
+      await updateIndex(env,index=>{
+        const item=index.threads.find(t=>t.id===threadId);
+        if(item){
+          item.updatedAt=next.updatedAt;
+          item.title=next.title;
+          item.messageCount=next.messages.length;
+        }
+        return index;
+      });
+      return next;
+    }catch(error){
+      last=error;
+      if(error?.status!==409&&error?.status!==422)throw error;
+      await new Promise(resolve=>setTimeout(resolve,90+attempt*130));
+    }
+  }
+  throw last||new Error("Message append conflict");
+}
+
 export async function appendThreadMessage(env, id, message) {
-  const current = await getThread(env, id);
-  if (!current) throw new Error("Thread bulunamadı");
-  return putThread(env, id, {
-    agentId: current.agentId,
-    title: current.title,
-    messages: [...current.messages, message],
-  });
+  return appendThreadMessages(env,id,[message]);
 }
 
 export async function listThreads(env, agentId) {
