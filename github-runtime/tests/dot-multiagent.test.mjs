@@ -46,7 +46,7 @@ function stubGithub(){
         const d=JSON.parse(options.body);
         // Simulate GitHub Contents API optimistic SHA requirements and create
         // a race window where two agent creation requests read the same roster.
-        if(name.includes("/rosters/"))await new Promise(r=>setTimeout(r,12));
+        if(name.includes("/rosters/")||name.includes("/threads/"))await new Promise(r=>setTimeout(r,12));
         const previous=saved.get(name);
         if((previous&&d.sha!==previous.sha)||(!previous&&d.sha))
           return Response.json({message:"SHA mismatch"},{status:409});
@@ -162,5 +162,34 @@ test("stale PC tunnel can be restarted and receives a fresh dispatch",async()=>{
     const current=stub.calls.filter(c=>c.url.endsWith("/dispatches"));
     assert.equal(current.length,previous+1);
     assert.equal(JSON.parse(current.at(-1).body).client_payload.agent_id,pcid);
+  }finally{globalThis.fetch=old}
+});
+
+test("simultaneous replies in one chat preserve BOTH user messages and answers",async()=>{
+  const stub=stubGithub(),old=globalThis.fetch;
+  globalThis.fetch=stub.fetch;
+  try{
+    const env=environment(),cookie=await login(env);
+    const created=await invoke(env,cookie,"POST","/dot/api/threads",{title:"İki istek"});
+    assert.equal(created.response.status,201);
+    const path="/dot/api/message";
+    const responses=await Promise.all([
+      invoke(env,cookie,"POST",path,{threadId:created.data.id,text:"İlk soru"},async data=>{
+        await new Promise(r=>setTimeout(r,30));
+        return {choices:[{message:{role:"assistant",content:"Yanıt A"}}]};
+      }),
+      invoke(env,cookie,"POST",path,{threadId:created.data.id,text:"İkinci soru"},async data=>{
+        await new Promise(r=>setTimeout(r,30));
+        return {choices:[{message:{role:"assistant",content:"Yanıt B"}}]};
+      })
+    ]);
+    assert.ok(responses.every(r=>r.response.status===200&&r.data.saved===true),
+      JSON.stringify(responses.map(r=>({status:r.response.status,data:r.data}))));
+    const read=await invoke(env,cookie,"GET","/dot/api/threads/"+created.data.id);
+    assert.equal(read.response.status,200);
+    assert.equal(read.data.messages.length,4);
+    const content=read.data.messages.map(m=>m.content);
+    for(const value of ["İlk soru","İkinci soru","Yanıt A","Yanıt B"])assert.ok(content.includes(value));
+    assert.equal(new Set(read.data.messages.map(m=>m.id)).size,4);
   }finally{globalThis.fetch=old}
 });
