@@ -534,12 +534,21 @@ export async function readPcState(env, agentId) {
   }
   try {
     const state = JSON.parse(raw);
+    const age = Math.max(0,Date.now()-Number(state.updated_at||0));
+    // A GitHub Actions runner sends a new heartbeat every 3 minutes. Never
+    // treat an expired tunnel URL as a live PC after abrupt runner termination.
+    const stale = (
+      (state.status==="running" && age>10*60*1000) ||
+      (state.status==="requested" && age>15*60*1000) ||
+      (state.status==="starting" && age>25*60*1000) ||
+      (state.status==="stopping" && age>15*60*1000)
+    );
     return {
       botId: id,
       container: "opendots-computer-" + id,
-      status: state.status || "unknown",
+      status: stale ? "stale" : (state.status || "unknown"),
       ...(state.url ? { url: state.url } : {}),
-      ...(state.message ? { message: state.message } : {}),
+      ...(stale ? { message:"PC bağlantısı zaman aşımına uğradı. PC Başlat ile güvenli yedekten yeniden başlatabilirsin." } : (state.message ? {message:state.message}:{})),
       ...(state.updated_at ? { updated_at: state.updated_at } : {}),
     };
   } catch (_) {
