@@ -67,3 +67,19 @@ ChatGPT'ye `API'yi başlat` dediğinde `[START API]` kontrol issue'su oluşturul
 `API'yi kapat` dediğinde issue kapatılır ve GitHub runner kapanır.
 
 Workflow kapalı olduğunda sabit URL cevap vermez; sonraki başlatmada aynı hostname tekrar kullanılır.
+
+
+## OpenDots ThreadHub + her agent'a ayrı GitHub PC
+
+Thread verilerini ve agent PC checkpoint dosyalarını özel `ai-application-suite-1` deposunun
+`agent-data` dalında saklayan entegrasyon ana repoya eklendi. Mevcut Metodbox API,
+ngrok workflow ve Cloudflare Worker yolları korunmuştur.
+
+**[Tam kurulum ve API rehberi](AGENT_THREADS_INTEGRATION.md)**
+
+PC kurulum komutu: `github-runtime/setup-private-storage.sh` (iki farklı scoped GitHub PAT ister).
+Ardından **Actions → Configure Private Thread Storage** workflow'unu çalıştır.
+Agent işlerini **Actions → Agent PC**, OpenDots'u **Actions → Launch Copilot App** üzerinden başlat.
+
+**Dikkat:** GitHub-hosted bilgisayarlar geçicidir; API ve PC'ler anahtarlar
+kurulup workflow'lar çalıştırılana kadar aktif değildir.
