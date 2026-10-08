@@ -1,3 +1,4 @@
+import { handlePortalRequest } from "./portal.js";
 import puppeteer from "@cloudflare/puppeteer";
 
 const GPTPLUS = "https://gptplus.metodbox.ai";
@@ -903,6 +904,9 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
+    const portalResponse = await handlePortalRequest(request, env, url);
+    if (portalResponse) return portalResponse;
+
     if (
       request.method === "GET" &&
       (url.pathname === "/" || url.pathname === "/health" || url.pathname === "/v1")
@@ -912,7 +916,7 @@ export default {
         service: "metodbox-direct-worker",
         models: MODELS,
         mode: "cloudflare-browser-run",
-        build: "openhands-tool-history-fix-v5-retry504",
+        build: "apps-portal-v1",
       });
     }
 
