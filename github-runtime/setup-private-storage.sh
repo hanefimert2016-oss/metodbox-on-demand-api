@@ -1,53 +1,72 @@
 #!/usr/bin/env bash
-# Run LOCALLY on Arch Linux, not in GitHub Actions. Never paste keys into chat.
+# Metodbox one-PAT bootstrap on Arch Linux.
+# The existing Cloudflare API credentials and Metodbox model key are reused.
 set -euo pipefail
 umask 077
 MAIN="hanefimert2016-oss/metodbox-on-demand-api"
-PRIVATE="hanefimert2016-oss/ai-application-suite-1"
+STORAGE="hanefimert2016-oss/Metodbox-secret-system"
 
-if ! command -v gh >/dev/null || ! command -v openssl >/dev/null; then
-  if command -v pacman >/dev/null; then
-    sudo pacman -S --needed github-cli openssl
+if ! command -v gh >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
+  sudo pacman -S --needed github-cli openssl
+fi
+gh auth status >/dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web
+
+if [[ "$(gh repo view "$STORAGE" --json isPrivate --jq .isPrivate)" != "true" ]]; then
+  echo "ERROR: $STORAGE is currently PUBLIC." >&2
+  echo "GitHub > Repository Settings > General > Danger Zone > Change visibility > Private" >&2
+  echo "Refusing to set up storage until it is private." >&2
+  exit 1
+fi
+gh api "repos/$STORAGE/branches/agent-data" --jq .name >/dev/null
+
+cat <<EOF
+Create ONE fine-grained Personal Access Token:
+  https://github.com/settings/personal-access-tokens/new
+Repository access: Only select repositories; select BOTH:
+  $MAIN
+  $STORAGE
+Permissions: Repository contents -> Read and write (metadata read is automatic).
+Use this one token for BOTH storage and repository_dispatch.
+Never send the token in chat.
+EOF
+read -r -s -p "Paste the single GitHub PAT here (hidden): " PAT
+printf '\n'
+if [[ -z "$PAT" ]]; then echo "Token missing" >&2; exit 1; fi
+for repo in "$MAIN" "$STORAGE"; do
+  GH_TOKEN="$PAT" gh api "repos/$repo" --jq .full_name >/dev/null || {
+    echo "PAT cannot access $repo; select BOTH repositories." >&2; exit 1;
+  }
+done
+printf '%s' "$PAT" | gh secret set AGENT_STORAGE_TOKEN --repo "$MAIN" --app actions
+unset PAT
+echo "Saved the ONE token as AGENT_STORAGE_TOKEN."
+
+echo "Portal username: admin."
+echo "Enter your requested portal password (2026)."
+read -r -s -p "Portal password (hidden): " PORTAL_PASS
+printf '\n'
+if [[ -z "$PORTAL_PASS" ]]; then echo "Password missing" >&2; exit 1; fi
+printf '%s' "$PORTAL_PASS" | gh secret set PORTAL_PASSWORD --repo "$MAIN" --app actions
+unset PORTAL_PASS
+
+secret_exists() {
+  gh secret list --repo "$MAIN" --app actions --json name --jq '.[].name' | grep -qx "$1"
+}
+for key in PORTAL_SESSION_SECRET STORAGE_ENCRYPTION_KEY; do
+  if secret_exists "$key"; then
+    echo "Existing $key preserved to avoid invalidating stored data."
   else
-    echo "Install GitHub CLI (gh) and openssl first." >&2
-    exit 1
+    openssl rand -hex 32 | tr -d '\n' | gh secret set "$key" --repo "$MAIN" --app actions
+    echo "Created cryptographically random $key."
   fi
-fi
+done
 
-gh auth status >/dev/null 2>&1 || gh auth login --web --hostname github.com --git-protocol https
-if [[ "$(gh repo view "$MAIN" --json nameWithOwner --jq .nameWithOwner)" != "$MAIN" ]]; then
-  echo "Main repo not found or account access missing." >&2; exit 1
-fi
-if [[ "$(gh repo view "$PRIVATE" --json isPrivate --jq .isPrivate)" != true ]]; then
-  echo "ERROR: Data repository is not private." >&2; exit 1
-fi
-gh api "repos/$PRIVATE/branches/agent-data" --jq .name >/dev/null
+for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID API_KEY; do
+  if ! secret_exists "$key"; then
+    echo "WARNING: Existing required secret $key is missing from $MAIN." >&2
+  fi
+done
 
-echo "Private data repo: $PRIVATE (branch: agent-data)"
-echo "Public code + GitHub Actions: $MAIN"
-echo ""
-echo "Create a fine-grained PAT for only the PRIVATE repository:"
-echo "https://github.com/settings/personal-access-tokens/new"
-echo "Permissions: Contents Read and write; Metadata Read."
-read -r -s -p "PRIVATE storage PAT (hidden): " PRIVATE_PAT
-printf '\n'
-[[ -n "$PRIVATE_PAT" ]] || { echo "Storage PAT missing" >&2; exit 1; }
-printf '%s' "$PRIVATE_PAT" | gh secret set AGENT_STORAGE_TOKEN -R "$MAIN"
-unset PRIVATE_PAT
-
-echo ""
-echo "Create a DIFFERENT fine-grained PAT for only the PUBLIC control repository:"
-echo "https://github.com/settings/personal-access-tokens/new"
-echo "Permissions: Contents Read and write (required for repository_dispatch)."
-read -r -s -p "PUBLIC dispatch PAT (hidden): " DISPATCH_PAT
-printf '\n'
-[[ -n "$DISPATCH_PAT" ]] || { echo "Dispatch PAT missing" >&2; exit 1; }
-printf '%s' "$DISPATCH_PAT" | gh secret set AGENT_DISPATCH_TOKEN -R "$MAIN"
-unset DISPATCH_PAT
-
-echo "Stored tokens as GitHub Actions secrets; never in source files."
-echo "You also need existing CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID and API_KEY secrets on $MAIN."
-echo ""
-echo "Finish setup from Actions > Configure Private Thread Storage > Run workflow:"
+echo "Finished locally. Run ONE workflow to configure Cloudflare:"
 echo "https://github.com/$MAIN/actions/workflows/configure-private-storage.yml"
-echo "Existing Manual API Server, OpenDots and Agent PC workflows were not started."
+echo "No ngrok account or token is needed."
