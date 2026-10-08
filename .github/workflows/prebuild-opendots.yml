@@ -1,0 +1,70 @@
+name: Prebuild OpenDots (Fast Startup)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "github-runtime/patch-opendots.py"
+      - "github-runtime/opendots-threadhub.ts"
+      - "github-runtime/opendots-overlay/**"
+      - ".github/workflows/prebuild-opendots.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prebuild-opendots
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout existing Metodbox main repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Restore prebuilt OpenDots cache
+        id: cached
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/opendots
+          key: opendots-built-ubuntu24-node24-625452e0-${{ hashFiles('github-runtime/patch-opendots.py', 'github-runtime/opendots-threadhub.ts', 'github-runtime/opendots-overlay/**') }}
+      - name: Clone and patch pinned OpenDots source
+        if: steps.cached.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenDots.git /tmp/opendots
+          git -C /tmp/opendots checkout 625452e06cde74cb25b0ce319e2c1be0488f5a5f
+          python3 github-runtime/patch-opendots.py /tmp/opendots
+          rm -rf /tmp/opendots/.git
+      - name: Install and compile the full Metodbox OpenDots bundle
+        if: steps.cached.outputs.cache-hit != 'true'
+        working-directory: /tmp/opendots
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
+          # No runtime keys or user data are included in this cache.
+          test -d node_modules
+          test ! -e .env
+      - name: Save complete production build in Github Actions cache
+        if: steps.cached.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/opendots
+          key: opendots-built-ubuntu24-node24-625452e0-${{ hashFiles('github-runtime/patch-opendots.py', 'github-runtime/opendots-threadhub.ts', 'github-runtime/opendots-overlay/**') }}
+      - name: Show result
+        run: |
+          if [ "${{ steps.cached.outputs.cache-hit }}" = "true" ]; then
+            echo "OpenDots build was already pre-cached." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Production OpenDots build cached for future launches." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "On launch, cache hit skips source clone, npm ci and npm run build." >> "$GITHUB_STEP_SUMMARY"
