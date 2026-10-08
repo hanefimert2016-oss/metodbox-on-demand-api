@@ -45,7 +45,9 @@ async function computerCall(env, kind, body) {
     method,
     headers:{Authorization:"Bearer "+await computerToken(env),"x-openbot-bot-id":AGENT_ID,"Content-Type":"application/json"},
     ...(method==="POST"?{body:JSON.stringify(body||{})}:{}),
-    redirect:"error",
+    // Cloudflare Workers supports follow/manual, not redirect:error.
+    // Manual still refuses any 3xx redirect because response.ok is false.
+    redirect:"manual",
     signal:AbortSignal.timeout(30000),
   });
   if(!response.ok)throw Error("PC "+kind+" HTTP "+response.status);
