@@ -183,6 +183,10 @@ export async function handleDotRequest(request,env,url,callModel) {
     if(path==="threads"&&request.method==="POST"){
       const data=await parseBody(request);
       const thread=await createThread(env,{agentId:AGENT_ID,title:String(data.title||"Yeni konuşma").slice(0,70)});
+      // Every new chat gets a completely new PC identity. Dispatch occurs
+      // immediately, but waiting for GitHub's VM is NOT required to chat.
+      try {thread.pc=await ensurePc(env,mainPcId(thread.id))}
+      catch(e){thread.pc={status:"error",message:errorText(e)}}
       return reply(thread,201);
     }
     const threadMatch=path.match(/^threads\/([A-Za-z0-9._-]+)$/);
@@ -196,6 +200,44 @@ export async function handleDotRequest(request,env,url,callModel) {
       if(!thread||thread.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
       return reply({ok:await deleteThread(env,threadMatch[1])});
     }
+    // All roster actions verify the owning encrypted chat before touching PCs.
+    const rosterMatch=path.match(/^chats\/([A-Za-z0-9._-]+)\/agents(?:\/(run|permissions))?$/);
+    if(rosterMatch){
+      const id=rosterMatch[1], action=rosterMatch[2]||"list";
+      const parent=await getThread(env,id);
+      if(!parent||parent.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
+      if(action==="list"&&request.method==="GET")return reply(await rosterFor(env,id));
+      if(action==="permissions"&&request.method==="POST"){
+        if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"Terminal izni için önce 12+ karakterli güçlü portal şifresi belirle."},403);
+        const input=await parseBody(request);
+        if(typeof input.allowExec!=="boolean")return reply({error:"İzin değeri gerekli"},400);
+        const old=await getRoster(env,id);
+        return reply(await saveRoster(env,id,{...old,allowExec:input.allowExec}));
+      }
+      if(action==="list"&&request.method==="POST"){
+        const input=await parseBody(request,10000);
+        const specs=Array.isArray(input.agents)?input.agents:[{name:input.name,task:input.task}];
+        // Each created child gets its own GitHub computer, independently dispatched.
+        const created=await createAgents(env,id,specs);
+        return reply({agents:created.agents,roster:created.roster},201);
+      }
+      if(action==="run"&&request.method==="POST"){
+        const input=await parseBody(request,10000);
+        const existing=await getRoster(env,id);
+        const ids=Array.isArray(input.agentIds)?input.agentIds:[input.agentId];
+        if(!ids.length||ids.length>3||new Set(ids).size!==ids.length)return reply({error:"Aynı anda 1-3 farklı agent çalıştır."},400);
+        const selected=ids.map(agentId=>existing.agents.find(x=>x.id===agentId));
+        if(selected.some(x=>!x))return reply({error:"Bu sohbete ait olmayan agent"},403);
+        const tasks=selected.map((a,i)=>({...a,task:typeof input.tasks?.[i]==="string"&&input.tasks[i].trim()?input.tasks[i].slice(0,2000):a.task}));
+        // Simultaneously send independent model requests using the same GPT+ gateway.
+        const outcomes=await Promise.allSettled(tasks.map(x=>runAgentTask(env,callModel,id,x,existing.allowExec&&String(env.PORTAL_PASSWORD||"").length>=12)));
+        const reports=outcomes.map((o,i)=>o.status==="fulfilled"?{id:tasks[i].id,report:o.value}:{id:tasks[i].id,error:errorText(o.reason)});
+        await updateAgentReports(env,id,reports);
+        return reply({parallel:true,reports});
+      }
+      return reply({error:"Unsupported agent action"},405);
+    }
+
     if(path==="message"&&request.method==="POST"){
       const data=await parseBody(request);
       const id=data.threadId, text=String(data.text||"").trim();
@@ -203,7 +245,7 @@ export async function handleDotRequest(request,env,url,callModel) {
       const thread=await getThread(env,id);
       if(!thread||thread.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
       const prev=thread.messages||[];
-      const result=await answerFromModel(env,callModel,prev,text);
+      const result=await answerFromModel(env,callModel,prev,text,id);
       const appended=[...prev,{id:crypto.randomUUID(),role:"user",content:text},{id:crypto.randomUUID(),role:"assistant",content:result}];
       let saved=true;
       try{await putThread(env,id,{agentId:AGENT_ID,messages:appended,title:thread.title==="Yeni konuşma"?text.slice(0,70):thread.title});}
@@ -217,21 +259,25 @@ export async function handleDotRequest(request,env,url,callModel) {
       const audio=await edgeSynthesize(data.text,String(data.voice||"tr-TR-EmelNeural"));
       return new Response(audio,{status:200,headers:{"Content-Type":"audio/mpeg","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
     }
-    if(path==="pc/status"&&request.method==="GET")return reply(await pcState(env));
-    if(path==="pc/start"&&request.method==="POST")return reply(await ensurePc(env,AGENT_ID));
-    if(path==="pc/stop"&&request.method==="POST")return reply(await stopPc(env,AGENT_ID));
-    if(path==="pc/navigate"&&request.method==="POST"){
-      const body=await parseBody(request);
-      return reply(await computerCall(env,"navigate",{url:validatePublicUrl(body.url)}));
-    }
-    if(path==="pc/screenshot"&&request.method==="POST")return reply(await computerCall(env,"screenshot"));
-    if(path==="pc/exec"&&request.method==="POST"){
-      // A short demo/admin password must never grant remote shell powers.
-      if(String(env.PORTAL_PASSWORD||"").length<12)
-        return reply({error:"Terminal için önce portal şifresini güçlü (12+ karakter) yapmalısın."},403);
-      const data=await parseBody(request);
-      if(typeof data.command!=="string"||!data.command.trim()||data.command.length>1500)return reply({error:"Geçersiz komut"},400);
-      return reply(await computerCall(env,"exec",{command:data.command,timeoutMs:Math.min(25000,Math.max(1000,Number(data.timeoutMs)||15000))}));
+    if(path.startsWith("pc/")){
+      const statusOnly=path==="pc/status"&&request.method==="GET";
+      const body=statusOnly?{chatId:url.searchParams.get("chatId"),agentId:url.searchParams.get("agentId")}:await parseBody(request);
+      const id=String(body.chatId||"");
+      if(!properThread(id))return reply({error:"Önce bir sohbet seç."},400);
+      const parent=await getThread(env,id);
+      if(!parent||parent.agentId!==AGENT_ID)return reply({error:"Konuşma bulunamadı"},404);
+      const pcId=await getAuthorizedAgent(env,id,body.agentId||"main");
+      if(statusOnly)return reply(await pcState(env,pcId));
+      if(path==="pc/start"&&request.method==="POST")return reply(await ensurePc(env,pcId));
+      if(path==="pc/stop"&&request.method==="POST")return reply(await stopPc(env,pcId));
+      if(path==="pc/navigate"&&request.method==="POST")return reply(await computerCall(env,"navigate",{url:validatePublicUrl(body.url)},pcId));
+      if(path==="pc/screenshot"&&request.method==="POST")return reply(await computerCall(env,"screenshot",{},pcId));
+      if(path==="pc/exec"&&request.method==="POST"){
+        if(String(env.PORTAL_PASSWORD||"").length<12)return reply({error:"Uzaktan terminal için 12+ karakterli güçlü portal şifresi gerekli."},403);
+        if(typeof body.command!=="string"||!body.command.trim()||body.command.length>1500)return reply({error:"Geçersiz komut"},400);
+        return reply(await computerCall(env,"exec",{command:body.command,timeoutMs:Math.min(25000,Math.max(1000,Number(body.timeoutMs)||15000))},pcId));
+      }
+      return reply({error:"PC action not found"},404);
     }
     return reply({error:"Route not found"},404);
   }catch(e){return reply({error:errorText(e)},503);}
