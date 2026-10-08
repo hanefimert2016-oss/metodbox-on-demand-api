@@ -1,4 +1,5 @@
 import { verifySession } from "./portal.js";
+import { edgeSynthesize } from "./edge-tts.js";
 import { dotPage } from "./dot-ui.js";
 import { createThread, getThread, putThread, listThreads, readPcState, ensurePc, stopPc } from "./threadhub.js";
 
@@ -154,6 +155,13 @@ export async function handleDotRequest(request,env,url,callModel) {
       catch(e){saved=false;console.error("Dot history save failed",errorText(e));}
       return reply({content:result,saved});
     }
+    if(path==="tts"&&request.method==="POST"){
+      const data=await parseBody(request,2200);
+      if(typeof data.text!=="string"||!data.text.trim()||data.text.length>1200)
+        return reply({error:"Invalid speech text"},400);
+      const audio=await edgeSynthesize(data.text,String(data.voice||"tr-TR-EmelNeural"));
+      return new Response(audio,{status:200,headers:{"Content-Type":"audio/mpeg","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
+    }
     if(path==="pc/status"&&request.method==="GET")return reply(await pcState(env));
     if(path==="pc/start"&&request.method==="POST")return reply(await ensurePc(env,AGENT_ID));
     if(path==="pc/stop"&&request.method==="POST")return reply(await stopPc(env,AGENT_ID));
@@ -163,6 +171,9 @@ export async function handleDotRequest(request,env,url,callModel) {
     }
     if(path==="pc/screenshot"&&request.method==="POST")return reply(await computerCall(env,"screenshot"));
     if(path==="pc/exec"&&request.method==="POST"){
+      // A short demo/admin password must never grant remote shell powers.
+      if(String(env.PORTAL_PASSWORD||"").length<12)
+        return reply({error:"Terminal için önce portal şifresini güçlü (12+ karakter) yapmalısın."},403);
       const data=await parseBody(request);
       if(typeof data.command!=="string"||!data.command.trim()||data.command.length>1500)return reply({error:"Geçersiz komut"},400);
       return reply(await computerCall(env,"exec",{command:data.command,timeoutMs:Math.min(25000,Math.max(1000,Number(data.timeoutMs)||15000))}));
