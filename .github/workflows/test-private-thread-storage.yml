@@ -1,0 +1,38 @@
+name: Test Private Thread and Agent Storage
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare-direct/src/threadhub.js"
+      - "github-runtime/storage-git.sh"
+      - "github-runtime/launch-agent-pc.sh"
+      - "github-runtime/launch-copilot-app.sh"
+      - "github-runtime/setup-private-storage.sh"
+      - "github-runtime/tests/threadhub-storage.test.mjs"
+      - ".github/workflows/test-private-thread-storage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check JavaScript and shell syntax
+        run: |
+          node --check cloudflare-direct/src/threadhub.js
+          bash -n github-runtime/storage-git.sh
+          bash -n github-runtime/launch-agent-pc.sh
+          bash -n github-runtime/launch-copilot-app.sh
+          bash -n github-runtime/setup-private-storage.sh
+      - name: Mock GitHub API tests
+        run: node --test github-runtime/tests/threadhub-storage.test.mjs
