@@ -127,7 +127,7 @@ async function createSession(env, username) {
   return payload + "." + await hmac(secret, payload);
 }
 
-async function verifySession(request, env) {
+export async function verifySession(request, env) {
   const secret = env.PORTAL_SESSION_SECRET || env.PORTAL_PASSWORD || env.API_KEY;
   if (!secret) return false;
   const token = parseCookies(request).mb_portal;
@@ -361,7 +361,7 @@ export async function handlePortalRequest(request, env, url) {
       status: 303,
       headers: {
         Location: "/apps",
-        "Set-Cookie": `mb_portal=${token}; Path=/apps; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
+        "Set-Cookie": `mb_portal=${token}; Path=/; Max-Age=${SESSION_SECONDS}; HttpOnly; Secure; SameSite=Lax`,
       },
     });
   }
@@ -371,7 +371,7 @@ export async function handlePortalRequest(request, env, url) {
       status: 303,
       headers: {
         Location: "/apps",
-        "Set-Cookie": "mb_portal=; Path=/apps; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
+        "Set-Cookie": "mb_portal=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
       },
     });
   }
