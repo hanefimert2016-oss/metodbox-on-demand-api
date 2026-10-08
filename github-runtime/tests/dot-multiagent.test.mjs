@@ -201,3 +201,31 @@ test("simultaneous replies in one chat preserve BOTH user messages and answers",
     assert.equal(new Set(read.data.messages.map(m=>m.id)).size,4);
   }finally{globalThis.fetch=old}
 });
+
+test("autonomous desktop control is opt-in per chat and old short passwords cannot enable it",async()=>{
+  const stub=stubGithub(),old=globalThis.fetch;
+  globalThis.fetch=stub.fetch;
+  try{
+    const env=environment(),cookie=await login(env);
+    const made=await invoke(env,cookie,"POST","/dot/api/threads",{title:"GUI permissions"});
+    assert.equal(made.response.status,201);
+    const route="/dot/api/chats/"+made.data.id+"/agents/permissions";
+    const before=await invoke(env,cookie,"GET","/dot/api/chats/"+made.data.id+"/agents");
+    assert.equal(before.data.allowDesktopAI,undefined);
+    const granted=await invoke(env,cookie,"POST",route,{allowDesktopAI:true});
+    assert.equal(granted.response.status,200,JSON.stringify(granted.data));
+    assert.equal(granted.data.allowDesktopAI,true);
+    const verified=await invoke(env,cookie,"GET","/dot/api/chats/"+made.data.id+"/agents");
+    assert.equal(verified.data.allowDesktopAI,true);
+    const revoked=await invoke(env,cookie,"POST",route,{allowDesktopAI:false});
+    assert.equal(revoked.response.status,200);
+    assert.equal(revoked.data.allowDesktopAI,false);
+    env.PORTAL_PASSWORD="2026";
+    const shortCookie=await login(env);
+    const invalid=await invoke(env,shortCookie,"POST",route,{allowDesktopAI:true});
+    assert.equal(invalid.response.status,403);
+    const mouse=await invoke(env,shortCookie,"POST","/dot/api/pc/desktop/action",
+      {chatId:made.data.id,agentId:"main",action:"click",x:100,y:100});
+    assert.equal(mouse.response.status,403);
+  }finally{globalThis.fetch=old}
+});
