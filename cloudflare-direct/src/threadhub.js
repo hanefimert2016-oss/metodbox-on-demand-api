@@ -50,13 +50,21 @@ function serviceAuthorized(request, env) {
 }
 
 function githubConfig(env) {
-  const token = String(env.GITHUB_TRIGGER_TOKEN || "").trim();
-  if (!token) throw new Error("GITHUB_TRIGGER_TOKEN Worker secret eksik");
-  return {
-    token,
-    repo: String(env.GITHUB_STORAGE_REPO || env.GITHUB_LAUNCH_REPO || DEFAULT_REPO),
-    branch: String(env.GITHUB_STORAGE_BRANCH || DATA_BRANCH),
-  };
+  // The private storage repository and public workflow launcher are different.
+  // Legacy GITHUB_TRIGGER_TOKEN remains a fallback for existing encrypted data.
+  const token = String(env.GITHUB_STORAGE_TOKEN || env.GITHUB_TRIGGER_TOKEN || "").trim();
+  if (!token) throw new Error("GITHUB_STORAGE_TOKEN Worker secret eksik");
+  const repo = String(env.GITHUB_STORAGE_REPO || DEFAULT_REPO);
+  const branch = String(env.GITHUB_STORAGE_BRANCH || DATA_BRANCH);
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+    throw new Error("GITHUB_STORAGE_REPO invalid");
+  }
+  if (!/^[A-Za-z0-9._/-]+$/.test(branch)) {
+    throw new Error("GITHUB_STORAGE_BRANCH invalid");
+  }
+  // A private repo is strongly recommended, as plaintext repo-level metadata
+  // and encrypted files are still visible to everyone in a public repository.
+  return { token, repo, branch };
 }
 
 function githubHeaders(env) {
@@ -407,7 +415,11 @@ export async function deleteThread(env, id) {
 }
 
 async function triggerDispatch(env, eventType, payload) {
-  const { repo, token } = githubConfig(env);
+  // repository_dispatch must target the PUBLIC CONTROL repo containing the
+  // agent-pc.yml workflow, not the private repo holding conversations.
+  const repo = String(env.GITHUB_LAUNCH_REPO || DEFAULT_REPO);
+  const token = String(env.GITHUB_TRIGGER_TOKEN || "").trim();
+  if (!token) throw new Error("GITHUB_TRIGGER_TOKEN Worker secret eksik");
   const response = await fetch(
     "https://api.github.com/repos/" + repo + "/dispatches",
     {
