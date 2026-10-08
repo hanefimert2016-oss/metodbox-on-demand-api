@@ -12,6 +12,57 @@ Bu sürüm **kalıcı açık sunucu değildir**: Cloudflare Worker sohbeti açar
 
 Doğrulama: [İki gerçek GPT+ yanıtı ve şifreli geçmişin canlı testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818302431) · [agent çakışması, PC eskimesi ve mobil UI testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818520475).
 
+## Dot Studio — gerçek Linux masaüstü (v0.4)
+
+**Bağlantı:** [Metodbox Dot Studio](https://metodbox-direct-api.hanefimert2016.workers.dev/dot)
+
+Eski OpenDots/CopilotKit arayüzünü yeniden kullanmıyoruz. Sıfırdan yazılan
+Dot Studio sayfasında telefon ve bilgisayar için uyarlanabilir sohbet arayüzü,
+**◈ Agentlar** paneli ve **▣ Masaüstü** paneli var. UI Cloudflare Worker'dan
+anında açılır; PC açılışı için beklemek yalnızca masaüstü gerektiğinde gerekir.
+
+**Masaüstü altyapısı:**
+- Her sohbetin ana PC'si ve her alt agent'ın kendi ayrı Docker/GitHub Actions
+  çalışma ortamı var. `github-runtime/patch-metodbox-desktop.py` mevcut
+  sabitlenmiş OpenBot bilgisayarını geçici build klasöründe geliştirir.
+- Hafif gerçek **Openbox + tint2 + xterm** masaüstü, 1280×800 sanal X11
+  ekranında çalışır. Chromium `COMPUTER_BROWSER_MODE=headed` ile
+  **aynı Xvfb ekranına** açılır. RAM tüketimi ağır bir masaüstünden düşüktür.
+  MicroDesk henüz kurulmadı.
+- PC'nin HMAC tokenıyla kimliği doğrulanmış `/desktop/info`,
+  `/desktop/screenshot`, `/desktop/click`, `/desktop/type`,
+  `/desktop/key`, `/desktop/scroll` uç noktaları vardır.
+  İnternet üzerinde yeni açık VNC/RDP portu oluşturulmaz.
+- Dot Studio masaüstü panelinde canlı ekranı görebilir, ekrana dokunarak
+  tıklayabilir, Türkçe metin yazmayı deneyebilir, kısayol gönderebilir,
+  Chromium'da web sitesi açabilir ve onayla terminal çalıştırabilirsin.
+  Ekran görüntüsü düzenli sorgulanır; ağ/sunum maliyetini sınırlamak için
+  gerçek zamanlı 60 FPS video aktarımı değildir.
+- Model araçları: `dot_browser_snapshot`, `dot_browser_click`,
+  `dot_browser_type`, `dot_browser_key` ile UI öğesi temelli
+  Computer Use; `dot_desktop_see`, `dot_desktop_click`,
+  `dot_desktop_type`, `dot_desktop_key` ile görüntü temelli kullanım.
+  Gerçek GPT+ model gateway'inde geçerli PNG görsel girdisi doğrulandı.
+  Ekran görüntüleri izin verilirse model sağlayıcısına gönderilir.
+
+**Güvenlik:** Masaüstü kontrolü ve AI'nın ekranı görüp tıklaması
+varsayılan **kapalıdır**. Her sohbette ayrı `AI'ın masaüstünde
+fare/klavye kullanmasına izin ver` seçeneği vardır. Ayrıca portal giriş
+şifresi en az **12 karakter** olmalıdır. Mevcut `2026` şifresiyle bu
+yetki açılamaz. Bu, hem kullanıcının hesap güvenliği hem de masaüstündeki
+kişisel dosyalar için bilinçli bir sınırlamadır.
+
+**Durum ve yedekler:** Her PC'nin kişisel `/workspace` ve Chromium profili
+özel şifreli GitHub deposuna kapanışta, ayrıca her 15 dakikada bir
+yedeklenmeye çalışılır. Klasörler aynı sohbet/agent ID'siyle yeniden
+başlatılabilir. Yedekleme başarılı olmalı; 80 MiB arşiv güvenlik sınırı
+ve GitHub PC çalışma süresi halen geçerlidir.
+
+**Testler:** [gerçek ana ve alt agent Openbox ekranı](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-native-dot-pc.yml),
+[yerel PC üzerinde fare/klavye testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-openbox-desktop.yml),
+[canlı GPT+ görsel girdi testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-dot-desktop-vision.yml)
+ve [Dot güvenlik testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-private-thread-storage.yml).
+
 ## Çoklu agent ve ayrı kalıcı PC sistemi
 
 **Mobil giriş:** <https://metodbox-direct-api.hanefimert2016.workers.dev/dot>. Giriş
