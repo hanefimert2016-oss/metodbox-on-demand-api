@@ -43,6 +43,58 @@ jobs:
           print('Model gateway smoke succeeded; actual answer omitted.')
           PY
 
+  threadhub-and-stream-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Test encrypted thread roundtrip plus real streaming model
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import { randomUUID } from 'node:crypto';
+          const base='https://metodbox-direct-api.hanefimert2016.workers.dev';
+          const token=process.env.API_KEY;
+          if (!token) throw Error('API_KEY secret missing');
+          const header={Authorization:'Bearer '+token,'Content-Type':'application/json'};
+          const call=async (path, method='GET', body) => {
+            const r=await fetch(base+path,{method,headers:header,
+              ...(body ? {body:JSON.stringify(body)} : {}),
+              signal:AbortSignal.timeout(90000)});
+            if(!r.ok) throw Error(path+' HTTP '+r.status);
+            return r.json();
+          };
+          const id=randomUUID();
+          try {
+            const created=await call('/api/threadhub/threads','POST',{id,agentId:'diagnostic',title:'Smoke'});
+            if(created.id!==id) throw Error('ThreadHub failed create');
+            const read=await call('/api/threadhub/threads/'+id);
+            if(read.id!==id) throw Error('ThreadHub failed read');
+            await call('/api/threadhub/threads/'+id,'DELETE');
+            console.log('Real encrypted ThreadHub create/read/delete: OK');
+          } catch(e) {
+            console.error('ThreadHub smoke FAILED: '+e.message);
+            throw e;
+          }
+          const response=await fetch(base+'/v1/chat/completions',{method:'POST',headers:header,
+            body:JSON.stringify({
+              model:'gpt-5.1',stream:true,max_tokens:64,
+              messages:[{role:'user',content:'Reply with a brief greeting, no tools.'}],
+              tools:[{type:'function',function:{name:'diagnostic_ping',
+                description:'Diagnostic unused tool',parameters:{type:'object',properties:{}}}}],
+              tool_choice:'auto'
+            }),signal:AbortSignal.timeout(120000)});
+          if(!response.ok) throw Error('Stream model HTTP '+response.status);
+          const payload=await response.text();
+          if(!payload.includes('data: [DONE]')) throw Error('Stream incomplete: missing DONE sentinel');
+          if(!payload.includes('chat.completion.chunk')) throw Error('Invalid chat streaming format');
+          const events=payload.split('\n\n').filter(v=>v.startsWith('data: {'));
+          const assistantParts=events.filter(v=>v.includes('"content"')||v.includes('"tool_calls"'));
+          if(!assistantParts.length) throw Error('Assistant emitted no content or tool calls');
+          console.log('Real GPT+ tool-compatible SSE stream: OK, chunks:',events.length);
+          JS
+
   computer-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
