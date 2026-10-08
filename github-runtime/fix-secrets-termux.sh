@@ -4,8 +4,20 @@ set -euo pipefail
 umask 077
 REPO="hanefimert2016-oss/metodbox-on-demand-api"
 
+if ! command -v pkg >/dev/null 2>&1; then
+  echo "Bu komut Android Termux içindir." >&2
+  exit 1
+fi
+if ! command -v gh >/dev/null 2>&1; then
+  echo "GitHub CLI eksik. gh paketi kuruluyor..."
+  pkg install -y gh
+fi
+if ! command -v openssl >/dev/null 2>&1; then
+  echo "OpenSSL komut satırı eksik. Termux'ta ayrı openssl-tool paketi kuruluyor..."
+  pkg install -y openssl-tool
+fi
 if ! command -v gh >/dev/null 2>&1 || ! command -v openssl >/dev/null 2>&1; then
-  echo "Termux'ta önce pkg install gh openssl çalıştır." >&2
+  echo "gh veya openssl çalıştırılamıyor. Şunları kontrol et: command -v gh; command -v openssl" >&2
   exit 1
 fi
 if ! gh auth status >/dev/null 2>&1; then
