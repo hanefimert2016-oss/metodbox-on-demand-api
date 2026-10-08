@@ -163,67 +163,28 @@ function loginPage(message = "", status = 200) {
 }
 
 function dashboardPage() {
-  const cards = Object.values(APPS).map((app) => `
-    <article class="app">
-      <p class="muted" style="margin:0 0 7px">CopilotKit</p>
-      <h2>${html(app.name)}</h2>
-      <p class="muted">${html(app.description)}</p>
-      <div class="row">
-        <button class="btn" onclick="startApp('${app.id}')">Başlat</button>
-        <a class="btn secondary" href="${app.repo}" target="_blank" rel="noreferrer">GitHub</a>
-      </div>
-      <div id="status-${app.id}" class="status muted">Durum kontrol ediliyor…</div>
-    </article>
-  `).join("");
-
-  return page("Metodbox Apps", `
+  return page("Metodbox Dot", `
     <div class="shell">
       <main class="card">
         <header class="top">
-          <div><strong>Metodbox Apps</strong><div class="muted" style="font-size:13px">Aynı GPT+ API altyapısı</div></div>
+          <div><strong>✦ Metodbox Dot</strong><div class="muted" style="font-size:13px">Kendi hafif asistanın · CopilotKit/OpenDots gerekmez</div></div>
           <form method="post" action="/apps/logout"><button class="btn secondary" type="submit">Çıkış</button></form>
         </header>
         <section class="pad">
-          <h1 class="title">Bir çalışma alanı seç</h1>
-          <p class="muted">Seçtiğin uygulama GitHub Actions üzerinde geçici olarak başlar ve hazır olduğunda ekranı burada açılır.</p>
-          <div class="grid">${cards}</div>
+          <h1 class="title">Yeni Dot'un hazır</h1>
+          <p class="muted">Sohbet ve sesli görüşme Cloudflare üzerinde anında açılır.
+            Bilgisayar yalnızca ihtiyaç olduğunda GitHub'da başlatılır.
+            Şifreli konuşmalar Metodbox-secret-system deposunda kalır.</p>
+          <div class="grid" style="grid-template-columns:1fr">
+            <article class="app">
+              <h2>✦ Metodbox Dot</h2>
+              <p class="muted">Hafif sohbet, telefon görüşmesi arayüzü, özel PC ve geçmiş.</p>
+              <a class="btn" style="display:inline-block;text-decoration:none" href="/dot">Dot'u Aç →</a>
+            </article>
+          </div>
         </section>
       </main>
-    </div>
-    <script>
-      async function status(app) {
-        try {
-          const r = await fetch('/apps/api/status?app=' + encodeURIComponent(app), {cache:'no-store'});
-          const j = await r.json();
-          const el = document.getElementById('status-' + app);
-          if (!el) return;
-          if (!r.ok) { el.textContent = j.error || 'Durum alınamadı'; el.className='status error'; return; }
-          el.textContent = j.status === 'ready' ? 'Hazır — açmak için Başlat düğmesine dokun.' :
-            j.status === 'starting' || j.status === 'requested' ? 'Başlatılıyor…' :
-            j.status === 'error' ? 'Hata: ' + (j.message || 'bilinmeyen hata') :
-            'Kapalı';
-          el.className='status ' + (j.status==='ready' ? 'ok' : (j.status==='error' ? 'error' : 'muted'));
-        } catch(e) {}
-      }
-      async function startApp(app) {
-        const el = document.getElementById('status-' + app);
-        el.textContent='Başlatma isteği gönderiliyor…'; el.className='status muted';
-        const r = await fetch('/apps/api/start', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({app})
-        });
-        const j = await r.json();
-        if (!r.ok) {
-          el.textContent='Hata: ' + (j.error || 'Başlatılamadı');
-          el.className='status error';
-          return;
-        }
-        location.href='/apps/run/' + app;
-      }
-      ['openbot','opendots'].forEach(status);
-      setInterval(()=>['openbot','opendots'].forEach(status),5000);
-    </script>
-  `);
+    </div>`);
 }
 
 function runnerPage(app) {
@@ -415,7 +376,19 @@ export async function handlePortalRequest(request, env, url) {
     }
   }
 
+  // Legacy CopilotKit/OpenDots application launches are retired. Native /dot replaces them.
   if (url.pathname === "/apps/api/start" && request.method === "POST") {
+    return Response.json({ error: "Eski uygulama kapatıldı. /dot adresini kullan." }, { status: 410 });
+  }
+
+  if (url.pathname === "/apps/api/retire" && request.method === "POST") {
+    await Promise.all(["openbot","opendots"].map(async app => {
+      await env.AUTH_KV.put("copilot_stop:"+app, "1", { expirationTtl: 3600 });
+    }));
+    return Response.json({ ok:true, message: "Eski OpenBot/OpenDots oturumlarına dur komutu gönderildi." });
+  }
+
+  if (false && url.pathname === "/apps/api/start" && request.method === "POST") {
     let payload = {};
     try { payload = await request.json(); } catch (_) {}
     const app = requireApp(payload.app);
