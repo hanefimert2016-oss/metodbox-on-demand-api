@@ -1,0 +1,81 @@
+name: Test Live Native Dot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-native-dot-live.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    env:
+      PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Sign in and test actual Cloudflare native Dot chat
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          const base="https://metodbox-direct-api.hanefimert2016.workers.dev";
+          const password=process.env.PORTAL_PASSWORD;
+          if(!password)throw Error("PORTAL_PASSWORD missing in GitHub Actions Secrets");
+          const login=await fetch(base+"/apps/login",{
+            method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded","Origin":base},
+            body:new URLSearchParams({username:"admin",password}),redirect:"manual",
+            signal:AbortSignal.timeout(30000)
+          });
+          if(login.status!==303)throw Error("Admin session HTTP "+login.status);
+          const cookie=login.headers.get("set-cookie")?.split(";")[0];
+          if(!cookie?.startsWith("mb_portal="))throw Error("Portal did not set signed cookie");
+          const html=await fetch(base+"/dot",{headers:{Cookie:cookie},redirect:"manual",signal:AbortSignal.timeout(15000)});
+          if(html.status!==200)throw Error("Native Dot page HTTP "+html.status);
+          const page=await html.text();
+          if(!page.includes("Metodbox Dot")||!page.includes("voiceButton"))throw Error("Native Dot UI missing");
+          console.log("Live Dot HTML and signed session: OK");
+          async function api(route,method="GET",payload){
+            const result=await fetch(base+"/dot/api/"+route,{
+              method,headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
+              ...(payload?{body:JSON.stringify(payload)}:{}),
+              signal:AbortSignal.timeout(120000)
+            });
+            const data=await result.json().catch(()=>({}));
+            if(!result.ok)throw Error(route+" HTTP "+result.status+": "+String(data.error||"").slice(0,180));
+            return data;
+          }
+          let id;
+          try{
+            const t=await api("threads","POST",{title:"Sistem otomatik testi"});
+            id=t.id;if(!id)throw Error("No thread id");
+            const result=await api("message","POST",{threadId:id,text:"Türkçe olarak tek cümlelik bir selam ver. Bilgisayar aracı kullanma."});
+            if(typeof result.content!=="string"||!result.content.trim())throw Error("Dot returned empty assistant answer");
+            if(result.saved!==true)throw Error("Assistant reply wasn't saved encrypted");
+            const stored=await api("threads/"+id);
+            if(!stored.messages?.some(m=>m.role==="assistant"&&m.content===result.content))
+              throw Error("Encrypted history round-trip failed");
+            console.log("Live Dot model answer and encrypted thread roundtrip: OK, length:",result.content.length);
+            const pc=await api("pc/status");
+            if(typeof pc.status!=="string")throw Error("PC state endpoint missing");
+            console.log("PC status endpoint: OK, status:",pc.status);
+          }finally{
+            if(id){try{await api("threads/"+id,"DELETE");console.log("Test conversation removed.")}catch(e){console.error("Cleanup failed:",e.message)}}
+          }
+          try{
+            const edge=await fetch(base+"/dot/api/tts",{
+              method:"POST",headers:{Cookie:cookie,Origin:base,"Content-Type":"application/json"},
+              body:JSON.stringify({text:"Merhaba, ben Dot.",voice:"tr-TR-EmelNeural"}),
+              signal:AbortSignal.timeout(23000)
+            });
+            const audio=await edge.arrayBuffer();
+            if(edge.ok&&audio.byteLength>500&&edge.headers.get("content-type")?.includes("audio/mpeg"))
+              console.log("Edge TTS remote speech: OK, MP3 bytes:",audio.byteLength);
+            else console.log("Edge TTS remote speech temporarily unavailable; device voice fallback active. HTTP",edge.status);
+          }catch(e){console.log("Edge TTS remote speech unavailable; device voice fallback active:",e.message)}
+          JS
