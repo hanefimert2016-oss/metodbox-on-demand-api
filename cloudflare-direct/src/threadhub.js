@@ -434,35 +434,49 @@ export async function getRoster(env, chatId) {
   return value || {chatId:id,mainPcId:"ch-"+id,agents:[],createdAt:Date.now(),updatedAt:Date.now()};
 }
 
-export async function saveRoster(env,chatId,roster) {
-  const id = safeId(chatId,"chat id");
-  if(!roster||!Array.isArray(roster.agents)||roster.agents.length>ROSTER_MAX_AGENTS) {
-    throw new Error("Agent roster exceeds safe limit");
+function cleanRoster(id,roster) {
+  if(!roster||!Array.isArray(roster.agents)||roster.agents.length>ROSTER_MAX_AGENTS){
+    throw new Error("En fazla 6 alt agent destekleniyor");
   }
-  const clean = {
-    chatId:id,mainPcId:"ch-"+id,
-    agents:roster.agents.map(x=>({
-      id:safeId(x.id,"child id"),name:String(x.name||"Agent").slice(0,80),
-      task:String(x.task||"").slice(0,2000),status:String(x.status||"idle").slice(0,32),
-      report:String(x.report||"").slice(0,8000),createdAt:Number(x.createdAt)||Date.now(),
-      updatedAt:Number(x.updatedAt)||Date.now()
-    })),
+  const agents=roster.agents.map(x=>({
+    id:safeId(x.id,"child id"),name:String(x.name||"Agent").slice(0,80),
+    task:String(x.task||"").slice(0,2000),status:String(x.status||"idle").slice(0,32),
+    report:String(x.report||"").slice(0,8000),createdAt:Number(x.createdAt)||Date.now(),
+    updatedAt:Number(x.updatedAt)||Date.now()
+  }));
+  if(new Set(agents.map(a=>a.id)).size!==agents.length)throw new Error("Duplicate agent ID");
+  return {
+    chatId:id,mainPcId:"ch-"+id,agents,
     allowExec:roster.allowExec===true,
     createdAt:Number(roster.createdAt)||Date.now(),updatedAt:Date.now()
   };
+}
+
+// Recompute the mutation against each fresh value after a GitHub 409/422
+// instead of retrying a stale roster that would silently overwrite peers.
+export async function updateRoster(env,chatId,mutate){
+  const id=safeId(chatId,"chat id");
   let last;
-  for(let i=0;i<5;i++){
+  for(let i=0;i<7;i++){
     const prev=await readEncrypted(env,rosterPath(id),null);
-    try {
+    const original=prev.value||{
+      chatId:id,mainPcId:"ch-"+id,agents:[],allowExec:false,
+      createdAt:Date.now(),updatedAt:Date.now()
+    };
+    const clean=cleanRoster(id,mutate(structuredClone(original)));
+    try{
       await writeEncrypted(env,rosterPath(id),clean,prev.sha,"agents: "+id+" roster");
       return clean;
     }catch(error){
       last=error;
       if(error?.status!==409&&error?.status!==422)throw error;
-      await new Promise(r=>setTimeout(r,80+i*100));
+      await new Promise(r=>setTimeout(r,75+i*130));
     }
   }
-  throw last||new Error("Agent list could not be persisted");
+  throw last||new Error("Agent listesinde eşzamanlı güncelleme çakışması");
+}
+export async function saveRoster(env,chatId,roster){
+  return updateRoster(env,chatId,()=>roster);
 }
 
 export async function deleteThread(env, id) {
