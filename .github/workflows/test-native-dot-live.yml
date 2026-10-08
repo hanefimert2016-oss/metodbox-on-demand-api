@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/test-native-dot-live.yml"
+      - "cloudflare-direct/src/edge-tts.js"
+      - "cloudflare-direct/src/dot-ui.js"
 
 permissions:
   contents: read
@@ -76,6 +78,6 @@ jobs:
             const audio=await edge.arrayBuffer();
             if(edge.ok&&audio.byteLength>500&&edge.headers.get("content-type")?.includes("audio/mpeg"))
               console.log("Edge TTS remote speech: OK, MP3 bytes:",audio.byteLength);
-            else console.log("Edge TTS remote speech temporarily unavailable; device voice fallback active. HTTP",edge.status);
+            else console.log("Edge TTS fallback active. HTTP",edge.status,"reason:",new TextDecoder().decode(audio).slice(0,150));
           }catch(e){console.log("Edge TTS remote speech unavailable; device voice fallback active:",e.message)}
           JS
