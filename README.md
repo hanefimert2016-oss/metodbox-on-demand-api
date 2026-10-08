@@ -6,7 +6,7 @@ Telefonunda **Termux** aç. Yeni şifreli veri deposunun PRIVATE olduğundan emi
 
 ```bash
 pkg update -y
-pkg install -y curl gh openssl
+pkg install -y curl gh openssl-tool
 curl -fsSL https://raw.githubusercontent.com/hanefimert2016-oss/metodbox-on-demand-api/main/github-runtime/setup-termux.sh -o ~/metodbox-termux.sh
 bash ~/metodbox-termux.sh
 ```
