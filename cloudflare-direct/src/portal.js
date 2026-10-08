@@ -1,5 +1,27 @@
 const DEFAULT_REPO = "hanefimert2016-oss/metodbox-on-demand-api";
 const SESSION_SECONDS = 12 * 60 * 60;
+const MAX_LOGIN_FAILURES = 5;
+const LOGIN_LOCK_SECONDS = 15 * 60;
+
+async function matchingSecret(a, b) {
+  const enc = new TextEncoder();
+  const [x, y] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(String(a))),
+    crypto.subtle.digest("SHA-256", enc.encode(String(b))),
+  ]);
+  const left = new Uint8Array(x), right = new Uint8Array(y);
+  let diff = 0;
+  for (let i = 0; i < left.length; i++) diff |= left[i] ^ right[i];
+  return diff === 0;
+}
+
+function portalLoginKey(request) {
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  // Avoid storing raw IPs in KV.
+  return crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))
+    .then(bytes => "portal_login_fail:" + b64url(new Uint8Array(bytes)).slice(0, 32));
+}
+
 const APPS = {
   openbot: {
     id: "openbot",
@@ -23,7 +45,7 @@ function html(value) {
     .replaceAll('"', "&quot;");
 }
 
-function page(title, body, extra = "") {
+function page(title, body, extra = "", status = 200) {
   return new Response(`<!doctype html>
 <html lang="tr">
 <head>
@@ -46,7 +68,7 @@ function page(title, body, extra = "") {
   ${extra}
 </head>
 <body>${body}</body></html>`, {
-    status: 200,
+    status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
@@ -121,7 +143,7 @@ async function verifySession(request, env) {
   }
 }
 
-function loginPage(message = "") {
+function loginPage(message = "", status = 200) {
   return page("Metodbox Apps", `
   <div class="shell">
     <div class="card login">
@@ -137,7 +159,7 @@ function loginPage(message = "") {
         </form>
       </div>
     </div>
-  </div>`);
+  </div>`, "", status);
 }
 
 function dashboardPage() {
@@ -282,16 +304,30 @@ export async function handlePortalRequest(request, env, url) {
   if (!url.pathname.startsWith("/apps")) return null;
 
   if (url.pathname === "/apps/login" && request.method === "POST") {
+    // Same-origin forms only. Rate-limit even invalid usernames.
+    const origin = request.headers.get("Origin");
+    if (origin && origin !== url.origin) {
+      return new Response("Origin denied", { status: 403 });
+    }
+    if (!env.PORTAL_PASSWORD || !env.PORTAL_SESSION_SECRET) {
+      return new Response("Portal password/session secrets are not configured", { status: 503 });
+    }
+    const key = await portalLoginKey(request);
+    const failures = Number(await env.AUTH_KV.get(key) || 0);
+    if (failures >= MAX_LOGIN_FAILURES) {
+      return loginPage("Çok fazla hatalı deneme. 15 dakika sonra tekrar dene.", 429);
+    }
     const form = await request.formData();
     const username = String(form.get("username") || "");
     const password = String(form.get("password") || "");
     const expectedUser = env.PORTAL_USERNAME || "admin";
-    const expectedPassword = env.PORTAL_PASSWORD || env.API_KEY || "";
-
-    if (!expectedPassword || username !== expectedUser || password !== expectedPassword) {
-      return loginPage("Kullanıcı adı veya şifre yanlış.");
+    const validUser = await matchingSecret(username, expectedUser);
+    const validPassword = await matchingSecret(password, env.PORTAL_PASSWORD);
+    if (!validUser || !validPassword) {
+      await env.AUTH_KV.put(key, String(failures + 1), { expirationTtl: LOGIN_LOCK_SECONDS });
+      return loginPage("Kullanıcı adı veya şifre yanlış.", 401);
     }
-
+    await env.AUTH_KV.delete(key);
     const token = await createSession(env, username);
     return new Response(null, {
       status: 303,
@@ -310,6 +346,13 @@ export async function handlePortalRequest(request, env, url) {
         "Set-Cookie": "mb_portal=; Path=/apps; Max-Age=0; HttpOnly; Secure; SameSite=Lax",
       },
     });
+  }
+
+  if (request.method === "POST") {
+    const origin = request.headers.get("Origin");
+    if (origin && origin !== url.origin) {
+      return new Response("Origin denied", { status: 403 });
+    }
   }
 
   if (!(await verifySession(request, env))) {
