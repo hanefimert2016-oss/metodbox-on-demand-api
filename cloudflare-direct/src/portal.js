@@ -1,4 +1,3 @@
-const DEFAULT_REPO = "hanefimert2016-oss/metodbox-on-demand-api";
 const SESSION_SECONDS = 12 * 60 * 60;
 const MAX_LOGIN_FAILURES = 5;
 const LOGIN_LOCK_SECONDS = 15 * 60;
@@ -22,20 +21,6 @@ function portalLoginKey(request) {
     .then(bytes => "portal_login_fail:" + b64url(new Uint8Array(bytes)).slice(0, 32));
 }
 
-const APPS = {
-  openbot: {
-    id: "openbot",
-    name: "OpenBot",
-    description: "AI coworker workspace with a real browser, files and tools.",
-    repo: "https://github.com/CopilotKit/OpenBot",
-  },
-  opendots: {
-    id: "opendots",
-    name: "OpenDots",
-    description: "Persistent AI coworkers, Spaces, pages and conversations.",
-    repo: "https://github.com/CopilotKit/OpenDots",
-  },
-};
 
 function html(value) {
   return String(value ?? "")
@@ -187,107 +172,6 @@ function dashboardPage() {
     </div>`);
 }
 
-function runnerPage(app) {
-  return page(app.name + " · Metodbox Apps", `
-    <div class="viewer-wrap">
-      <div class="viewer-bar">
-        <div class="row"><a class="btn secondary" href="/apps">← Geri</a><strong>${html(app.name)}</strong></div>
-        <div class="row"><span id="state" class="muted">Başlatılıyor…</span><span id="spin" class="spinner"></span><a class="btn secondary" id="external" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Yeni sekmede aç</a><button class="btn danger" onclick="stopApp()">Durdur</button></div>
-      </div>
-      <div id="waiting" class="shell" style="min-height:calc(100vh - 64px)">
-        <div style="text-align:center;max-width:540px">
-          <h2>${html(app.name)} hazırlanıyor</h2>
-          <p class="muted" id="detail">GitHub runner ve Cloudflare bağlantısı hazırlanıyor.</p>
-          <p class="muted" id="help">İlk kurulumda indirme ve derleme sürebilir. Bu sayfa işlemi otomatik takip eder.</p>
-          <p><a class="btn secondary" href="https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/launch-copilot-app.yml" target="_blank" rel="noopener noreferrer">GitHub Actions durumunu gör ↗</a></p>
-        </div>
-      </div>
-    </div>
-    <script>
-      const app=${JSON.stringify(app.id)};
-      const started=Date.now();
-      async function poll(){
-        const state=document.getElementById('state');
-        const detail=document.getElementById('detail');
-        const help=document.getElementById('help');
-        try {
-          const r=await fetch('/apps/api/status?app='+encodeURIComponent(app),{cache:'no-store'});
-          const j=await r.json();
-          if(!r.ok){state.textContent='Hata'; detail.textContent=j.error||'Durum alınamadı'; setTimeout(poll,5000);return;}
-          state.textContent=j.status||'unknown';
-          if(j.status==='ready' && j.url){
-            const external=document.getElementById('external');
-            const dest=new URL(j.url);
-            if(dest.protocol!=='https:' || !dest.hostname.endsWith('.trycloudflare.com')) {
-              state.textContent='Bağlantı hatası';
-              detail.textContent='Beklenmeyen çalışma adresi; GitHub Actions kayıtlarını kontrol et.';
-              document.getElementById('spin').style.display='none';
-              return;
-            }
-            external.href=dest.href;
-            external.style.display='inline-block';
-            document.getElementById('spin').style.display='none';
-            state.textContent='Hazır';
-            detail.textContent='OpenDots doğrudan tarayıcıda açılıyor. Açılmazsa Yeni sekmede aç bağlantısını kullan.';
-            help.textContent='Güvenlik nedeniyle OpenDots iframe içinde çalışmaz; doğrudan açılması gerekir.';
-            // The upstream app forbids iframe embedding (X-Frame-Options/CSP).
-            // Same-tab navigation works on mobile and preserves token-based app login.
-            window.location.replace(dest.href);
-            return;
-          }
-          if(j.status==='error' || j.status==='stopped'){
-            document.getElementById('spin').style.display='none';
-            detail.textContent=j.message||'Uygulama durdu. Ana sayfadan tekrar başlatabilirsiniz.';
-            help.textContent='Ayrıntılar için GitHub Actions bağlantısını aç.';
-            return;
-          }
-          detail.textContent=j.message||'GitHub Actions üzerinde hazırlanıyor…';
-          if(Date.now()-started>4*60*1000){
-            help.textContent='Başlatma uzun sürüyor. Hata mı, devam eden derleme mi olduğunu GitHub Actions sayfasından görebilirsin.';
-          }
-          setTimeout(poll,3000);
-        } catch(e) {
-          state.textContent='Yeniden bağlanıyor';
-          detail.textContent='Durum alınamadı. İnternet bağlantısı kontrol edilip yeniden denenecek.';
-          setTimeout(poll,5000);
-        }
-      }
-      async function stopApp(){
-        await fetch('/apps/api/stop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({app})});
-        location.href='/apps';
-      }
-      poll();
-    </script>
-  `);
-}
-
-async function triggerLaunch(env, app) {
-  const token = env.GITHUB_TRIGGER_TOKEN;
-  if (!token) throw new Error("GITHUB_TRIGGER_TOKEN Worker secret eksik");
-  const repo = env.GITHUB_LAUNCH_REPO || DEFAULT_REPO;
-  const response = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "metodbox-app-launcher",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      event_type: "launch_copilot_app",
-      client_payload: { app },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GitHub launch HTTP ${response.status}: ${text.slice(0, 300)}`);
-  }
-}
-
-function requireApp(id) {
-  return APPS[String(id || "").toLowerCase()] || null;
-}
 
 export async function handlePortalRequest(request, env, url) {
   if (!url.pathname.startsWith("/apps")) return null;
@@ -359,24 +243,13 @@ export async function handlePortalRequest(request, env, url) {
   }
 
   if (url.pathname.startsWith("/apps/run/") && request.method === "GET") {
-    const app = requireApp(url.pathname.split("/").pop());
-    if (!app) return new Response("Not found", { status: 404 });
-    return runnerPage(app);
+    return Response.redirect(url.origin + "/dot", 302);
   }
 
   if (url.pathname === "/apps/api/status" && request.method === "GET") {
-    const app = requireApp(url.searchParams.get("app"));
-    if (!app) return Response.json({ error: "Geçersiz uygulama" }, { status: 400 });
-    const raw = await env.AUTH_KV.get(`copilot_runtime:${app.id}`);
-    if (!raw) return Response.json({ app: app.id, status: "stopped" });
-    try {
-      return Response.json(JSON.parse(raw));
-    } catch (_) {
-      return Response.json({ app: app.id, status: "unknown" });
-    }
+    return Response.json({status:"retired",url:"/dot"});
   }
 
-  // Legacy CopilotKit/OpenDots application launches are retired. Native /dot replaces them.
   if (url.pathname === "/apps/api/start" && request.method === "POST") {
     return Response.json({ error: "Eski uygulama kapatıldı. /dot adresini kullan." }, { status: 410 });
   }
@@ -388,58 +261,14 @@ export async function handlePortalRequest(request, env, url) {
     return Response.json({ ok:true, message: "Eski OpenBot/OpenDots oturumlarına dur komutu gönderildi." });
   }
 
-  if (false && url.pathname === "/apps/api/start" && request.method === "POST") {
-    let payload = {};
-    try { payload = await request.json(); } catch (_) {}
-    const app = requireApp(payload.app);
-    if (!app) return Response.json({ error: "Geçersiz uygulama" }, { status: 400 });
-
-    // Multiple taps on mobile must not dispatch more GitHub jobs. Each new
-    // dispatch cancels an existing same-app workflow because of concurrency.
-    const existingRaw = await env.AUTH_KV.get(`copilot_runtime:${app.id}`);
-    if (existingRaw) {
-      try {
-        const existing = JSON.parse(existingRaw);
-        if (["requested", "starting", "ready"].includes(existing.status)) {
-          return Response.json({
-            ok: true,
-            app: app.id,
-            status: existing.status,
-            already_running: true,
-          });
-        }
-      } catch (_) {}
-    }
-
-    await env.AUTH_KV.delete(`copilot_stop:${app.id}`);
-    await env.AUTH_KV.put(
-      `copilot_runtime:${app.id}`,
-      JSON.stringify({ app: app.id, status: "requested", message: "Başlatma isteği GitHub'a gönderiliyor.", updated_at: Date.now() }),
-      { expirationTtl: 6 * 60 * 60 }
-    );
-
-    try {
-      await triggerLaunch(env, app.id);
-      return Response.json({ ok: true, app: app.id, status: "requested" });
-    } catch (error) {
-      const message = error?.message || String(error);
-      await env.AUTH_KV.put(
-        `copilot_runtime:${app.id}`,
-        JSON.stringify({ app: app.id, status: "error", message, updated_at: Date.now() }),
-        { expirationTtl: 60 * 60 }
-      );
-      return Response.json({ error: message }, { status: 503 });
-    }
-  }
-
   if (url.pathname === "/apps/api/stop" && request.method === "POST") {
     let payload = {};
     try { payload = await request.json(); } catch (_) {}
-    const app = requireApp(payload.app);
-    if (!app) return Response.json({ error: "Geçersiz uygulama" }, { status: 400 });
-    await env.AUTH_KV.put(`copilot_stop:${app.id}`, "1", { expirationTtl: 10 * 60 });
+    const app = String(payload.app || "");
+    if (!["openbot","opendots"].includes(app)) return Response.json({ error: "Geçersiz uygulama" }, { status: 400 });
+    await env.AUTH_KV.put(`copilot_stop:${app}`, "1", { expirationTtl: 10 * 60 });
     await env.AUTH_KV.put(
-      `copilot_runtime:${app.id}`,
+      `copilot_runtime:${app}`,
       JSON.stringify({ app: app.id, status: "stopping", message: "Durdurma isteği gönderildi.", updated_at: Date.now() }),
       { expirationTtl: 60 * 60 }
     );
