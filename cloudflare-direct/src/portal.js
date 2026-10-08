@@ -73,7 +73,7 @@ function page(title, body, extra = "", status = 200) {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-src https://*.trycloudflare.com; connect-src 'self'; img-src 'self' data:",
+      "Content-Security-Policy": "default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:",
     },
   });
 }
@@ -241,7 +241,6 @@ function runnerPage(app) {
           <p><a class="btn secondary" href="https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/launch-copilot-app.yml" target="_blank" rel="noopener noreferrer">GitHub Actions durumunu gör ↗</a></p>
         </div>
       </div>
-      <iframe id="frame" class="viewer" style="display:none" referrerpolicy="no-referrer"></iframe>
     </div>
     <script>
       const app=${JSON.stringify(app.id)};
@@ -266,11 +265,13 @@ function runnerPage(app) {
             }
             external.href=dest.href;
             external.style.display='inline-block';
-            document.getElementById('waiting').style.display='none';
             document.getElementById('spin').style.display='none';
-            const frame=document.getElementById('frame');
-            if(frame.src!==dest.href){frame.src=dest.href;}
-            frame.style.display='block';
+            state.textContent='Hazır';
+            detail.textContent='OpenDots doğrudan tarayıcıda açılıyor. Açılmazsa Yeni sekmede aç bağlantısını kullan.';
+            help.textContent='Güvenlik nedeniyle OpenDots iframe içinde çalışmaz; doğrudan açılması gerekir.';
+            // The upstream app forbids iframe embedding (X-Frame-Options/CSP).
+            // Same-tab navigation works on mobile and preserves token-based app login.
+            window.location.replace(dest.href);
             return;
           }
           if(j.status==='error' || j.status==='stopped'){
