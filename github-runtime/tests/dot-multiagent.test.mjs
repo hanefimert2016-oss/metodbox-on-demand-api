@@ -229,3 +229,56 @@ test("autonomous desktop control is opt-in per chat and old short passwords cann
     assert.equal(mouse.response.status,403);
   }finally{globalThis.fetch=old}
 });
+
+test("consented main AI can observe a screenshot then send real desktop click via authenticated PC proxy",async()=>{
+  const github=stubGithub(),old=globalThis.fetch;
+  let clicked=false,seenImage=false,round=0;
+  globalThis.fetch=async(url,options={})=>{
+    if(String(url).startsWith("https://unit-gui.trycloudflare.com/desktop/")){
+      if(String(url).endsWith("/desktop/screenshot"))return Response.json({
+        surface:"desktop",base64:"iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB",width:1280,height:800
+      });
+      if(String(url).endsWith("/desktop/click")){
+        const body=JSON.parse(options.body);
+        clicked=body.x===120&&body.y===200;
+        return Response.json({ok:true,action:"click",x:body.x,y:body.y});
+      }
+    }
+    return github.fetch(url,options);
+  };
+  try{
+    const env=environment(),cookie=await login(env);
+    const create=await invoke(env,cookie,"POST","/dot/api/threads",{title:"GUI AI testi"});
+    assert.equal(create.response.status,201);
+    const id=create.data.id,agentId="ch-"+id;
+    await env.AUTH_KV.put("agent_pc:"+agentId,JSON.stringify({
+      status:"running",url:"https://unit-gui.trycloudflare.com",
+      heartbeat:true,updated_at:Date.now()
+    }));
+    const grant=await invoke(env,cookie,"POST","/dot/api/chats/"+id+"/agents/permissions",{allowDesktopAI:true});
+    assert.equal(grant.response.status,200);
+    const result=await invoke(env,cookie,"POST","/dot/api/message",
+      {threadId:id,text:"Ekranı analiz et ve belirtilen konuma tıkla."},async request=>{
+        round++;
+        if(round===1){
+          assert.ok(request.tools.some(t=>t.function.name==="dot_desktop_see"));
+          return {choices:[{message:{role:"assistant",content:"",tool_calls:[{
+            id:"call_see",type:"function",function:{name:"dot_desktop_see",arguments:"{}"}
+          }]}}]};
+        }
+        if(round===2){
+          seenImage=request.messages.some(m=>Array.isArray(m.content)
+            &&m.content.some(c=>c.type==="image_url"&&String(c.image_url?.url).startsWith("data:image/png;base64,")));
+          return {choices:[{message:{role:"assistant",content:"",tool_calls:[{
+            id:"call_click",type:"function",
+            function:{name:"dot_desktop_click",arguments:JSON.stringify({x:120,y:200})}
+          }]}}]};
+        }
+        return {choices:[{message:{role:"assistant",content:"Masaüstünü inceledim ve tıkladım."}}]};
+      });
+    assert.equal(result.response.status,200,JSON.stringify(result.data));
+    assert.equal(seenImage,true);
+    assert.equal(clicked,true);
+    assert.match(result.data.content,/tıkladım/);
+  }finally{globalThis.fetch=old}
+});
