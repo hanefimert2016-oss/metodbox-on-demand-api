@@ -911,12 +911,16 @@ export default {
 
     // Native Dot is served by this Worker; no GitHub app runner needed.
     const dotResponse = await handleDotRequest(request, env, url, async body => {
-      const upstream = await callGptPlus(env, sanitizeToolFields({...body, stream: false}));
+      // Pass real upstream SSE bytes to Dot's stream parser. Never wait for
+      // a full completion and then fake token-by-token typing.
+      const wantsStream = body.stream === true;
+      const upstream = await callGptPlus(env, sanitizeToolFields({...body,stream:wantsStream}));
       if (!upstream.ok) {
         throw new Error("Metodbox model HTTP " + upstream.status + ": " + (await upstream.text()).slice(0,250));
       }
+      if(wantsStream) return upstream;
       const data = await upstream.json();
-      return sanitizeChatToolCalls(data, body);
+      return sanitizeChatToolCalls(data,body);
     });
     if (dotResponse) return dotResponse;
 
