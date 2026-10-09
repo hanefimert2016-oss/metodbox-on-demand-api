@@ -312,7 +312,7 @@ async function parseBody(request, max=9000) {
   if(text.length>max)throw Error("İstek çok büyük");
   return JSON.parse(text||"{}");
 }
-export async function handleDotRequest(request,env,url,callModel) {
+export async function handleDotRequest(request,env,url,callModel,ctx=null) {
   if(!(url.pathname==="/dot"||url.pathname==="/dot/"||url.pathname==="/dot/team"||url.pathname.startsWith("/dot/api/")))return null;
   if(!await authorized(request,env)){
     if(url.pathname.startsWith("/dot/api/"))return reply({error:"Oturum gerekli. /dot adresinden giriş yap."},401);
@@ -335,8 +335,16 @@ export async function handleDotRequest(request,env,url,callModel) {
       const thread=await createThread(env,{agentId:AGENT_ID,title:String(data.title||"Yeni konuşma").slice(0,70)});
       // Every new chat gets a completely new PC identity. Dispatch occurs
       // immediately, but waiting for GitHub's VM is NOT required to chat.
-      try {thread.pc=await ensurePc(env,mainPcId(thread.id))}
-      catch(e){thread.pc={status:"error",message:errorText(e)}}
+      if(ctx&&typeof ctx.waitUntil==="function"){
+        thread.pc={status:"requested",message:"PC arka planda başlatılıyor; sohbet hazır."};
+        ctx.waitUntil(ensurePc(env,mainPcId(thread.id)).catch(e=>{
+          console.error("Background chat PC dispatch failed",errorText(e));
+        }));
+      }else{
+        // Local tests or runtimes without execution context retain old behavior.
+        try{thread.pc=await ensurePc(env,mainPcId(thread.id))}
+        catch(e){thread.pc={status:"error",message:errorText(e)}}
+      }
       return reply(thread,201);
     }
     const threadMatch=path.match(/^threads\/([A-Za-z0-9._-]+)$/);
