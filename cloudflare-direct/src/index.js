@@ -899,7 +899,7 @@ function responsesSse(responseObject) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -921,7 +921,7 @@ export default {
       if(wantsStream) return upstream;
       const data = await upstream.json();
       return sanitizeChatToolCalls(data,body);
-    });
+    },ctx);
     if (dotResponse) return dotResponse;
 
     const portalResponse = await handlePortalRequest(request, env, url);
