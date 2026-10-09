@@ -1,10 +1,11 @@
-// Metodbox native Openbox desktop adapter for OpenBot's authenticated HTTP server.
+// Metodbox XFCE desktop adapter for OpenBot's authenticated computer API.
 // No extra network listener. Shared DISPLAY with the headed Playwright browser.
 // All inputs are passed as argv, never interpolated into shell commands.
 import { readFile, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
 let started = false;
+let bootPromise: Promise<void> | null = null;
 const WIDTH = 1280, HEIGHT = 800;
 
 async function command(argv: string[], timeout = 8000) {
@@ -27,24 +28,42 @@ function json(value: unknown, status = 200) {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-export async function startMetodboxDesktop(display: string | undefined) {
-  if (!display || started) return;
-  started = true;
-  process.env.DISPLAY = display;
-  // The processes inherit Bun's Xvfb DISPLAY, so the screenshot is the whole
-  // Linux desktop, not an artificial preview of the browser's DOM.
-  for (const args of [
-    ["openbox", "--sm-disable"],
-    ["tint2", "-c", "/etc/xdg/tint2/tint2rc"],
-    ["xterm", "-geometry", "110x27+56+70", "-title", "Metodbox Terminal", "-e", "bash"],
-  ]) {
-    try {
-      Bun.spawn(args, { env: process.env, stdout: "ignore", stderr: "ignore" }).unref();
-    } catch (error) {
-      console.warn("Metodbox desktop optional process failed:", args[0], String(error));
+// Fail closed if the real XFCE panel never appears. No fallback pretending a
+// plain Openbox screen is a complete desktop environment.
+export async function startMetodboxDesktop(display: string | undefined): Promise<void> {
+  if (!display) return;
+  if (bootPromise) return bootPromise;
+  bootPromise = (async () => {
+    process.env.DISPLAY = display;
+    process.env.XDG_CURRENT_DESKTOP = "XFCE";
+    process.env.DESKTOP_SESSION = "xfce";
+    // /profiles is backed up to the encrypted private repository with the
+    // rest of each agent's workspace; preferences survive new GitHub runners.
+    process.env.XDG_CONFIG_HOME = "/profiles/xfce-config";
+    const proc = Bun.spawn(
+      ["dbus-run-session", "--", "/usr/local/bin/metodbox-start-xfce"],
+      { env: process.env, stdout: "ignore", stderr: "ignore" }
+    );
+    proc.unref();
+    let lastError = "XFCE session did not start";
+    for (let attempt = 0; attempt < 64; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      try {
+        // The XFCE panel and xfdesktop must both be present. A running
+        // DBus process by itself does not mean a usable GUI is visible.
+        await command(["pgrep", "-x", "xfce4-panel"], 1800);
+        await command(["pgrep", "-x", "xfdesktop"], 1800);
+        started = true;
+        console.info("Metodbox XFCE session ready on", display);
+        return;
+      } catch (error) {
+        lastError = String(error);
+      }
     }
-  }
-  console.info("Metodbox desktop booted on", display);
+    bootPromise = null; // Permit a new attempt if container boot is retried.
+    throw Error("XFCE desktop failed to initialize: " + lastError.slice(0, 160));
+  })();
+  return bootPromise;
 }
 
 export async function handleMetodboxDesktop(request: Request, pathname: string): Promise<Response | null> {
@@ -54,7 +73,7 @@ export async function handleMetodboxDesktop(request: Request, pathname: string):
 
   try {
     if (route === "info" && request.method === "GET") {
-      return json({ mode: "openbox", display: process.env.DISPLAY, width: WIDTH, height: HEIGHT, ready: true });
+      return json({ mode: "xfce", desktop: "XFCE 4", display: process.env.DISPLAY, width: WIDTH, height: HEIGHT, ready: true, features: ["xfwm4","xfdesktop","xfce4-panel","thunar","xfce4-terminal"] });
     }
     if (route === "screenshot" && request.method === "GET") {
       const filename = "/tmp/metodbox-shot-" + randomUUID() + ".png";
