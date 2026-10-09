@@ -1,315 +1,295 @@
-// Metodbox Dot Studio — lightweight original UI, no React/CopilotKit runtime.
-export function dotPage() {
-const HTML=String.raw`<!doctype html><html lang="tr"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#090d18"><title>Metodbox Dot Studio</title>
+export function dotPage(){
+const HTML=String.raw`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a0e13"><title>Dot — Metodbox</title>
 <style>
-:root{color-scheme:dark;--bg:#090d17;--layer:#101726;--soft:#151e30;--line:#28344d;--ink:#f1f5ff;--muted:#9aabc5;--brand:#73a8ff;--mint:#5bd4be;--red:#ed8491}
-*{box-sizing:border-box}html,body{height:100%;margin:0}body{background:var(--bg);color:var(--ink);font:14px system-ui,-apple-system,"Segoe UI",sans-serif}
-button,textarea,input,select{font:inherit}button{cursor:pointer;border:1px solid var(--line);color:var(--ink);background:#1a2640;border-radius:11px;padding:10px 12px;transition:background .15s,transform .15s}button:hover{background:#283b5b}button:active{transform:scale(.985)}button:disabled{opacity:.55;cursor:wait}
-button.primary{background:#436ccf;border-color:#648fe9;font-weight:650}button.primary:hover{background:#547fe3}button.ghost{background:transparent}button.danger{background:#4a2533;color:#ffb5c1}button.small{padding:7px 9px;font-size:12px}a{color:#b2d2ff;text-decoration:none}
-input,textarea,select{background:#121d30;color:var(--ink);border:1px solid #304363;border-radius:11px;padding:11px 12px;outline:none;min-width:0}textarea{resize:vertical}input:focus,textarea:focus,select:focus{border-color:#6596e9}
-.shell{height:100dvh;display:grid;grid-template-columns:254px minmax(0,1fr)}.rail{background:#0e1523;border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.brand{display:flex;align-items:center;gap:11px;padding:6px 9px}.logo{height:37px;width:37px;border-radius:14px;background:radial-gradient(circle at 28% 24%,#b5d8ff,#517cd1 54%,#273779);display:grid;place-items:center;box-shadow:0 5px 28px #3b73dc44;font-size:22px}
-.brand strong{font-size:18px;letter-spacing:-.5px}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
-.caption{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.11em;padding:6px 12px}
-#threads{flex:1;overflow:auto;min-height:0}.thread{display:block;width:100%;text-align:left;background:transparent;border:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:12px 12px;font-size:13px;color:#b8c6dc}.thread.active{color:white;background:#233550;box-shadow:inset 3px 0 #8cbaff}
-.railFooter{border-top:1px solid var(--line);padding:13px 8px;color:var(--muted);font-size:12px;line-height:1.6}.railFooter a{display:inline-block;margin-top:6px}
-main{display:flex;min-width:0;height:100dvh;flex-direction:column}.topbar{height:65px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 18px;border-bottom:1px solid var(--line)}
-.heading{display:flex;align-items:center;gap:11px;min-width:0}.heading h1{font-size:15px;margin:0;letter-spacing:-.1px}.heading p{margin:2px 0 0;color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tools{display:flex;align-items:center;gap:7px}.chip{font-size:11px;color:#aeeada;background:#113b36;border:1px solid #1f665b;padding:6px 9px;border-radius:100px}
-.topbtn{background:#151e30;font-size:12px}.workspace{display:flex;min-height:0;flex:1;position:relative}
-.conversation{display:flex;flex:1;flex-direction:column;min-width:0}
-#messages{flex:1;min-height:0;overflow:auto;padding:24px max(18px,calc((100% - 850px)/2));scroll-behavior:smooth}
-.welcome{margin:8vh auto 30px;max-width:560px;text-align:center}.welcome .symbol{margin:auto;width:75px;height:75px;border-radius:26px;background:radial-gradient(circle at 25% 20%,#8dd0ff,#4770d3 56%,#27366c);display:grid;place-items:center;font-size:35px;box-shadow:0 12px 55px #426ac64a}.welcome h2{font-size:28px;letter-spacing:-1px;margin:22px 0 10px}.welcome p{line-height:1.7;color:var(--muted);font-size:13px}
-.message{max-width:810px;margin:0 auto 20px;display:flex;align-items:flex-start;gap:11px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
-.message .face{width:30px;height:30px;flex:0 0 30px;border-radius:11px;background:#23385f;display:grid;place-items:center}.message.user .face{background:#2c4c47}
-.message .content{min-width:0;flex:1;border:1px solid var(--line);padding:12px 16px;background:#121c2d;border-radius:5px 16px 16px 16px}
-.message.user .content{background:#1c2e48}.message .who{color:#a9c9ff;font-size:11px;font-weight:750;display:block;margin-bottom:5px}
-.composeWrap{border-top:1px solid var(--line);padding:14px clamp(12px,3vw,24px) calc(14px + env(safe-area-inset-bottom));background:#0e1421}
-.compose{max-width:920px;margin:auto;display:flex;align-items:end;gap:10px}.compose textarea{flex:1;min-height:49px;max-height:160px}.compose button{min-height:49px}.hint{color:#7187a5;font-size:11px;text-align:center;margin-top:9px}
-.drawer{width:445px;flex:0 0 445px;border-left:1px solid var(--line);background:#101725;display:none;overflow:auto;padding:17px}.drawer.open{display:block}
-.drawerHead{display:flex;align-items:start;justify-content:space-between;gap:10px;margin-bottom:16px}.drawer h2{margin:0 0 3px;font-size:17px}.drawer .sub{font-size:11px;color:var(--muted);line-height:1.4}
-.row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.row.spread{justify-content:space-between}.field{display:block;color:#aabfdc;font-size:11px;margin:12px 0 7px;font-weight:700}
-.statusbox{border:1px solid #324460;background:#152239;border-radius:12px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7f8a9e;margin-right:7px}.dot.ready{background:#64d6b0;box-shadow:0 0 0 3px #64d6b022}.dot.wait{background:#e4b46e}
-.desktop{background:#060a12;border:1px solid #3c4c64;border-radius:13px;overflow:hidden;position:relative;min-height:235px;display:flex;align-items:center;justify-content:center}
-.desktop img{display:block;max-width:100%;width:100%;height:auto;cursor:crosshair;user-select:none;-webkit-user-drag:none}
-.desktopPlaceholder{color:#7288a4;text-align:center;padding:42px 15px;font-size:12px;line-height:1.7}
-.desktopBar{display:flex;gap:8px;align-items:center;justify-content:space-between;background:#18243a;border:1px solid #38465e;border-bottom:0;border-radius:12px 12px 0 0;padding:10px 12px;font-size:11px;color:#bed4f6}
-.screenControls{margin:10px 0}.screenControls input{width:100%;margin:6px 0}.screenControls .row button{flex:1}
-.report{background:#0b1322;border:1px solid var(--line);padding:12px;border-radius:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:230px;overflow:auto;font-size:12px;line-height:1.55;color:#bbcee6}
-.agent{background:#172439;border:1px solid #2e405d;padding:12px;border-radius:12px;margin:8px 0}.agent.selected{border-color:#7caeff}.agent h3{margin:0 0 6px;font-size:13px}.agent p{color:#b1c1d6;font-size:11px;line-height:1.5;max-height:84px;overflow:auto}
-.checkbox{display:flex;align-items:center;gap:9px;color:#bdcde4;font-size:12px;line-height:1.5}.checkbox input{width:16px;height:16px}
-.call{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:40;background:#090e1df4;padding:24px}.call.open{display:flex}.callcard{text-align:center;width:min(470px,100%);padding:32px 24px;background:#121d30;border:1px solid #375076;border-radius:25px;box-shadow:0 26px 120px #000b}
-.callorb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 25% 23%,#b8dbff,#4a77dd,#283c7b);display:grid;place-items:center;margin:12px auto 25px;font-size:42px;box-shadow:0 0 0 16px #4464ad1c}.callcard h2{margin:7px}.callcard p{line-height:1.6;color:#a9bddb;font-size:13px}
-#menuBtn{display:none}
-@media(max-width:1050px){.shell{grid-template-columns:215px minmax(0,1fr)}.drawer{position:absolute;right:0;top:0;bottom:0;width:min(455px,100%);z-index:9;box-shadow:-14px 0 65px #0009;flex:none}}
-@media(max-width:720px){.shell{display:block}.rail{position:fixed;z-index:20;left:0;top:0;bottom:0;width:min(290px,87vw);display:none;box-shadow:12px 0 70px #0009}.rail.open{display:flex}#menuBtn{display:block}.topbar{padding:0 10px;height:61px}.heading p{display:none}.topbtn{padding:9px;font-size:12px}.chip{display:none}.drawer{width:100%;left:0}.welcome{margin:8vh auto 20px}.welcome h2{font-size:24px}#messages{padding:16px 12px}.message .content{padding:11px}.composeWrap{padding:10px 9px calc(11px + env(safe-area-inset-bottom))}.hint{display:none}}
+:root{color-scheme:dark;--bg:#0a0e13;--panel:#111820;--panel2:#172129;--border:#293841;--text:#f3f6f5;--muted:#92a6ad;--accent:#c7f38b;--hover:#223039;--red:#fe968e}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+button,input,textarea,select{font:inherit}button{cursor:pointer;border:1px solid var(--border);border-radius:11px;padding:10px 13px;color:var(--text);background:var(--panel2);transition:background .12s}button:hover{background:var(--hover)}button:disabled{opacity:.5;cursor:default}button.accent{background:var(--accent);color:#19211c;border-color:var(--accent);font-weight:750}button.quiet{background:transparent}button.danger{background:#392329;color:#ffb5b0}button.sm{padding:7px 10px;font-size:12px}button svg{vertical-align:middle}
+a{color:var(--accent);text-decoration:none}input,textarea,select{background:#0d141b;border:1px solid #354650;border-radius:12px;color:var(--text);padding:11px 12px;outline:none;min-width:0}input:focus,textarea:focus{border-color:#a3cb7b}textarea{resize:none}
+.frame{display:grid;grid-template-columns:246px minmax(0,1fr);height:100dvh}.side{display:flex;flex-direction:column;border-right:1px solid var(--border);padding:20px 12px;background:#0f151c;min-width:0}.brand{display:flex;gap:11px;align-items:center;padding:4px 10px 25px}.emblem{background:var(--accent);width:36px;height:36px;display:grid;place-items:center;color:#152315;border-radius:12px;font-size:23px}.brand strong{font-size:19px;letter-spacing:-.6px}.brand span{display:block;color:var(--muted);font-size:10px;letter-spacing:1.2px;text-transform:uppercase}.sidebarHeading{padding:21px 12px 9px;color:var(--muted);font-size:11px;font-weight:750;text-transform:uppercase;letter-spacing:1.1px}
+#chats{overflow:auto;flex:1;min-height:0}.chatItem{width:100%;text-align:left;border:0;background:none;display:block;color:#aec0c4;font-size:13px;padding:12px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chatItem.active{background:#1f2d32;color:#ecf7df}
+.sideFooter{border-top:1px solid var(--border);padding:13px 11px;color:var(--muted);font-size:12px}.online{color:var(--accent)}
+.main{min-width:0;display:flex;flex-direction:column;position:relative}.top{height:69px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:0 24px;gap:10px}.topTitle{min-width:0}.topTitle strong{font-size:15px}.topTitle small{color:var(--muted);display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45vw}.topActions{display:flex;gap:7px;align-items:center}.chip{background:#213323;border:1px solid #345738;border-radius:99px;padding:5px 10px;font-size:11px;color:#cef5af}
+#chatArea{min-height:0;flex:1;overflow:auto;scroll-behavior:smooth}.messages{max-width:850px;padding:30px 22px 30px;margin:0 auto}.hero{padding:clamp(55px,13vh,135px) 0 40px;max-width:610px;margin:auto}.hero .mark{width:53px;height:53px;background:#203b2d;color:var(--accent);border:1px solid #456d48;display:grid;place-items:center;border-radius:17px;font-size:29px;margin-bottom:23px}.hero h1{font-size:clamp(28px,3vw,40px);font-weight:670;letter-spacing:-1.4px;line-height:1.15;margin:0 0 15px}.hero p{color:var(--muted);max-width:440px;line-height:1.8;margin:0}.suggestions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:30px}.suggestions button{font-size:12px;text-align:left;padding:15px;background:#121b21;border-radius:13px}
+.turn{display:flex;gap:12px;margin-bottom:26px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.74}.avatar{width:29px;height:29px;flex:none;border-radius:9px;background:#233b31;color:var(--accent);display:grid;place-items:center;font-size:16px}.turn.user .avatar{background:#243039;color:#c7e0ef}.bubble{flex:1;min-width:0;max-width:100%;padding-top:3px}.speaker{font-weight:700;font-size:12px;margin-bottom:7px}.content{font-size:14px;color:#dce8e5}.turn.user .content{color:#f4f7f8}.streaming .content::after{content:'▌';animation:blink 1s step-end infinite;color:var(--accent)}@keyframes blink{50%{opacity:0}}.stage{display:block;font-size:11px;color:var(--accent);padding:6px 0}
+.composeDock{padding:12px 23px calc(18px + env(safe-area-inset-bottom));border-top:1px solid var(--border)}.compose{max-width:820px;margin:auto;background:#111a20;border:1px solid #40534b;border-radius:19px;padding:9px;display:flex;align-items:end;gap:8px}.compose textarea{flex:1;max-height:185px;min-height:42px;background:transparent;border:0;padding:11px 13px;line-height:1.5;resize:none}.compose button{min-width:48px;min-height:42px}.hint{font-size:11px;color:#6d858a;text-align:center;margin:8px 0 0}
+.drawer{display:none;position:absolute;right:0;top:0;bottom:0;width:min(430px,100%);background:#121b22;border-left:1px solid #40524d;z-index:15;box-shadow:-18px 0 75px #0009;padding:20px;overflow-y:auto}.drawer.open{display:block}.drawTop{display:flex;align-items:center;justify-content:space-between;gap:12px}.drawer h2{font-size:18px;margin:0 0 4px}.muted{color:var(--muted);font-size:12px}.label{display:block;color:#adc0c1;font-size:12px;margin:17px 0 7px}.statusBox{border-radius:12px;background:#1e2b2b;border:1px solid #334b40;padding:14px;margin:15px 0;color:#c7e2d4;font-size:12px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row button{flex:none}.row input{flex:1}.full{width:100%}
+.screenFrame{background:#03070a;border:1px solid #536562;border-radius:13px;min-height:240px;display:grid;place-items:center;overflow:hidden}.screenFrame img{width:100%;height:auto;display:none;cursor:crosshair;user-select:none;-webkit-user-drag:none}.screenEmpty{color:#8da6a1;text-align:center;font-size:12px;padding:35px}
+.log{padding:12px;border:1px solid var(--border);background:#0b1117;border-radius:12px;color:#b4c8c5;font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;margin-top:12px}
+.agentCard{border:1px solid #35483e;background:#1a2927;border-radius:13px;padding:13px;margin:10px 0}.agentCard strong{font-size:13px}.agentCard p{margin:5px 0 10px;color:var(--muted);font-size:12px}.check{display:flex;align-items:center;gap:9px;margin:10px 0;color:#c2d3cc;font-size:12px}
+#menu{display:none}.call{display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;background:#081010ed}.call.open{display:flex}.callCard{text-align:center;background:#172324;border-radius:23px;padding:35px;width:min(430px,90vw);border:1px solid #486151}.callOrb{display:grid;place-items:center;width:105px;height:105px;border-radius:50%;background:var(--accent);color:#162213;font-size:48px;margin:0 auto 25px;box-shadow:0 0 0 16px #bcef9022}
+@media(max-width:780px){.frame{display:block}.side{position:fixed;left:0;top:0;bottom:0;width:min(286px,88vw);z-index:25;display:none;box-shadow:12px 0 65px #000b}.side.open{display:flex}.main{height:100dvh}.top{height:61px;padding:0 12px}.chip{display:none}#menu{display:block}.topActions button{padding:8px;font-size:12px}.messages{padding:18px 15px}.hero{padding:75px 0 30px}.suggestions{grid-template-columns:1fr}.composeDock{padding:9px 9px calc(11px + env(safe-area-inset-bottom))}.hint{display:none}}
 </style></head><body>
-<div class="shell">
-<aside class="rail" id="rail">
-  <div class="brand"><div class="logo">✦</div><div><strong>Metodbox Dot</strong><small>Agent workspace</small></div></div>
-  <button class="primary" id="newChat">＋ Yeni çalışma alanı</button>
-  <div class="caption">Konuşmalar</div><div id="threads"></div>
-  <div class="railFooter"><span class="dot ready"></span> Kendi GPT+ API'n<br>Şifreli özel GitHub geçmişi<br><a href="/apps">Hesap ayarları ↗</a></div>
-</aside>
-<main>
-  <header class="topbar">
-    <div class="heading"><button class="ghost small" id="menuBtn">☰</button><div><h1>✦ Dot Studio</h1><p id="chatTitle">Her sohbet ayrı bir bilgisayardır</p></div></div>
-    <div class="tools"><span class="chip">● Bağlı</span><button class="topbtn" id="agentsBtn">◈ Agentlar</button><button class="topbtn" id="pcBtn">▣ Masaüstü</button><button class="primary" id="callBtn">☎ Ara</button></div>
+<div class="frame"><aside class="side" id="sidebar">
+  <div class="brand"><span class="emblem">◈</span><div><strong>Dot</strong><span>METODBOX STUDIO</span></div></div>
+  <button class="accent full" id="newChat">＋ Yeni sohbet</button><div class="sidebarHeading">Çalışma alanları</div><div id="chats"></div>
+  <div class="sideFooter"><span class="online">●</span> GPT+ bağlı<br>Her sohbet ayrı PC kimliği<br><a href="/apps">Hesap ve ayarlar ↗</a></div>
+ </aside><main class="main">
+  <header class="top"><div class="row"><button id="menu" class="quiet sm">☰</button><div class="topTitle"><strong>Dot <span style="color:var(--accent)">/</span> Studio</strong><small id="chatTitle">Yeni çalışma alanı</small></div></div>
+   <div class="topActions"><span class="chip">● Model hazır</span><button id="agentBtn" class="sm">◈ Agentlar</button><button id="pcBtn" class="sm">▣ PC</button><button id="callBtn" class="sm">☎ Ara</button></div>
   </header>
-  <div class="workspace">
-    <section class="conversation"><div id="messages"><div class="welcome"><div class="symbol">✦</div><h2>Ne oluşturmak istiyorsun?</h2><p>Dot senin ana agent'ın. Kendi bilgisayarında kod yazabilir, web üzerinde çalışabilir ve görevleri bağımsız alt agent'lara dağıtabilir. Başlamak için mesaj gönder veya yeni çalışma alanı oluştur.</p></div></div>
-    <div class="composeWrap"><div class="compose"><textarea id="prompt" rows="1" placeholder="Dot'a bir görev ver..."></textarea><button id="send" class="primary">Gönder ↗</button></div><div class="hint" id="status">Kendi modelin · Eşzamanlı agentlar · Kalıcı çalışma alanları</div></div></section>
-    <aside class="drawer" id="pcDrawer">
-      <div class="drawerHead"><div><h2>▣ Canlı Masaüstü</h2><div class="sub">Openbox · Linux · Chromium · Terminal</div></div><button class="small ghost" id="pcClose">✕</button></div>
-      <label class="field" for="pcTarget">Agent bilgisayarı</label><select id="pcTarget"><option value="main">Ana Agent</option></select>
-      <div class="statusbox"><span class="dot wait" id="pcDot"></span><strong id="pcState">Bilgisayar bekleniyor</strong><div class="sub" id="pcDescription">GitHub Actions sanal PC'yi hazırlar.</div></div>
-      <div class="row" style="margin-bottom:12px"><button class="small primary" id="pcStart">▶ Başlat</button><button class="small" id="pcStop">■ Durdur + yedekle</button><button class="small" id="refresh">↻ Yenile</button></div>
-      <div class="desktopBar"><span>● Metodbox Linux · 1280 × 800</span><span id="frameTime">Canlı ekran</span></div>
-      <div class="desktop" id="desktop"><div id="desktopPlaceholder" class="desktopPlaceholder">▣<p>Bilgisayar açıldığında gerçek Linux masaüstü burada görünecek.</p></div><img id="screen" style="display:none" alt="Agent'ın gerçek Linux masaüstü"/></div>
-      <div class="row screenControls"><button class="small" id="clickMode">☞ Ekrana dokun: tıkla</button><button class="small" id="scrollUp">↑ Kaydır</button><button class="small" id="scrollDown">↓ Kaydır</button></div>
-      <label class="field">Klavyeden yaz</label><input id="typeText" placeholder="Masaüstüne yazılacak metin"><div class="row" style="margin-top:7px"><button class="small primary" id="typeButton">Yaz →</button><button class="small" id="enter">↵ Enter</button><button class="small" id="tab">⇥ Tab</button><button class="small" id="escape">Esc</button><button class="small" id="ctrlL">Ctrl+L</button></div>
-      <label class="field">Tarayıcı adresi</label><div class="row"><input id="url" value="https://example.org" style="flex:1"><button class="small" id="visit">Git</button></div>
-      <label class="field">Terminal (onay gerektirir)</label><textarea id="command" rows="2" style="width:100%" placeholder="Örn. pwd"></textarea><button id="exec" class="small">⌘ Komutu çalıştır</button>
-      <div class="field">İşlem sonucu</div><div class="report" id="pcLog">Masaüstü açılmayı bekliyor.</div>
-    </aside>
-    <aside class="drawer" id="agentsDrawer">
-      <div class="drawerHead"><div><h2>◈ Agent Ekibi</h2><div class="sub">Ana agent + bağımsız PC'li alt agentlar</div></div><button class="small ghost" id="agentsClose">✕</button></div>
-      <div class="statusbox" id="teamSummary">Bir sohbet seçtiğinde ekibi görebilirsin.</div>
-      <div id="agentCards"></div>
-      <label class="field">Yeni alt agent</label><input id="agentName" placeholder="Örn. Araştırmacı" maxlength="80" style="width:100%">
-      <textarea id="agentTask" placeholder="Bu agent'ın görevi..." maxlength="2000" style="width:100%;margin-top:8px" rows="3"></textarea>
-      <div class="row" style="margin:10px 0"><button class="small primary" id="addAgent">＋ Agent oluştur</button><button class="small" id="runAgents">▶ Paralel çalıştır</button></div>
-      <label class="checkbox"><input type="checkbox" id="waitForPc" checked> Görevden önce PC'ler hazır olsun</label>
-      <label class="checkbox" style="margin-top:13px"><input type="checkbox" id="agentTerminal"> AI agentlarına terminal izni</label>
-      <label class="checkbox" style="margin-top:10px"><input type="checkbox" id="aiDesktop"> AI'ın masaüstünde fare/klavye kullanmasına izin ver</label>
-      <div class="report" id="agentLog" style="margin-top:15px">Agentların görev raporları burada görünecek.</div>
-      <p class="sub" style="line-height:1.6">En çok 6 alt agent, bir turda 3 paralel model çağrısı. PC'ler ayrı GitHub runner'lardır. Terminal ve AI masaüstü izni kapalı başlar.</p>
-    </aside>
-  </div>
-</main></div>
-<div class="call" id="callOverlay"><div class="callcard"><div class="callorb">✦</div><h2>Dot ile konuş</h2><p id="callText">Mikrofon hazırlanıyor.</p><select id="voice" style="width:100%"><option value="tr-TR-EmelNeural">Emel · Neural Türkçe</option><option value="tr-TR-AhmetNeural">Ahmet · Neural Türkçe</option><option value="device">Telefon sesi</option></select><div class="row" style="justify-content:center;margin-top:20px"><button id="mute">🎙 Mikrofonu kapat</button><button class="danger" id="hangup">☎ Bitir</button></div><p style="font-size:11px">Tarayıcı görüşmesi · Mikrofon/konuşma tanıma desteği telefona bağlıdır. Neural ses için metin Microsoft'a gönderilebilir.</p></div></div>
+  <div id="chatArea"><div id="messages" class="messages"><section class="hero" id="hero"><div class="mark">✦</div><h1>Fikirden sonuca.<br>Tek bir çalışma alanında.</h1><p>Bir görev yaz. Dot yanıtını yazarken gör, alt agentları yönet ve gerektiğinde gerçek Linux bilgisayarını aç.</p><div class="suggestions"><button data-prompt="Bir web uygulaması için plan ve dosya yapısı oluştur.">↗ Web uygulaması geliştir</button><button data-prompt="Üç alt agente bölünebilen bir araştırma görevi planla.">◈ Çoklu agent görevi planla</button><button data-prompt="Bilgisayarımda bir web sitesini açmak için gerekli adımları anlat.">▣ Bilgisayar kullan</button><button data-prompt="Günlük görevlerim için kısa bir plan oluştur.">✦ Yeni bir plan oluştur</button></div></section></div></div>
+  <div class="composeDock"><div class="compose"><textarea id="prompt" rows="1" placeholder="Dot'a bir şey söyle..."></textarea><button id="send" class="accent" title="Gönder">↑</button><button id="stop" class="danger" style="display:none" title="Yanıtı durdur">■</button></div><div class="hint" id="status">Yanıtlar gerçek zamanlı akışla gelir. Shift+Enter: yeni satır.</div></div>
+  <aside id="pcDrawer" class="drawer"><div class="drawTop"><div><h2>▣ Bulut bilgisayarı</h2><div class="muted">Openbox · Chromium · Terminal</div></div><button class="quiet" id="pcClose">✕</button></div>
+   <label class="label">Bilgisayar</label><select class="full" id="pcTarget"><option value="main">Ana agent</option></select><div class="statusBox" id="pcState">Henüz başlatılmadı.</div>
+   <div class="row"><button class="accent sm" id="pcStart">▶ Başlat</button><button id="pcStop" class="sm">■ Durdur</button><button id="refresh" class="sm">↻ Yenile</button></div>
+   <p class="label">Canlı ekran · 1280 × 800</p><div class="screenFrame"><div class="screenEmpty" id="emptyScreen">PC hazır olunca gerçek Linux ekranı burada görünür.</div><img id="screen" alt="Linux desktop"></div>
+   <div class="row" style="margin-top:10px"><button id="scrollUp" class="sm">↑ Kaydır</button><button id="scrollDown" class="sm">↓ Kaydır</button><button id="enter" class="sm">↵ Enter</button><button id="tab" class="sm">Tab</button></div>
+   <label class="label">Klavyeye yaz</label><div class="row"><input id="typeText" placeholder="Metin..."><button id="typeButton" class="accent sm">Yaz</button></div>
+   <label class="label">Adres</label><div class="row"><input id="url" value="https://example.org"><button id="visit" class="sm">Git</button></div>
+   <label class="label">Terminal</label><textarea id="command" rows="2" class="full" placeholder="Örn. pwd"></textarea><button class="sm" id="exec">⌘ Komutu onayla ve çalıştır</button>
+   <div class="log" id="pcLog">PC henüz açılmadı.</div>
+  </aside>
+  <aside id="agentsDrawer" class="drawer"><div class="drawTop"><div><h2>◈ Agent ekibi</h2><div class="muted">Ana agent ve bağımsız çalışma alanları</div></div><button class="quiet" id="agentsClose">✕</button></div>
+   <div class="statusBox" id="teamSummary">Agentlar yükleniyor…</div><div id="agentCards"></div>
+   <label class="label">Alt agent oluştur</label><input id="agentName" class="full" maxlength="80" placeholder="Agent adı">
+   <textarea id="agentTask" rows="3" class="full" style="margin-top:9px" maxlength="2000" placeholder="Agentın görevini yaz..."></textarea>
+   <div class="row" style="margin-top:10px"><button id="addAgent" class="accent sm">＋ Oluştur</button><button id="runAgents" class="sm">▶ Seçilenleri çalıştır</button></div>
+   <label class="check"><input id="waitForPc" type="checkbox" checked> PC hazır olana kadar bekle</label>
+   <label class="check"><input id="agentTerminal" type="checkbox"> AI terminal izni</label>
+   <label class="check"><input id="aiDesktop" type="checkbox"> AI fare/klavye izni</label>
+   <div class="log" id="agentLog">Alt agentları buradan yöneteceksin.</div>
+  </aside>
+ </main></div>
+<div id="callOverlay" class="call"><div class="callCard"><div class="callOrb">✦</div><h2>Dot ile konuş</h2><p id="callText" class="muted">Mikrofon hazırlanıyor…</p><select id="voice" class="full"><option value="tr-TR-EmelNeural">Emel · Neural Türkçe</option><option value="tr-TR-AhmetNeural">Ahmet · Neural Türkçe</option><option value="device">Telefon sesi</option></select><div class="row" style="justify-content:center;margin-top:20px"><button id="mute">🎙 Sustur</button><button id="hangup" class="danger">☎ Bitir</button></div></div></div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-const st={chat:null,threads:[],roster:null,agent:'main',busy:false,pcStatus:null,watch:false,refreshBusy:false,voice:false,muted:false,recognizer:null,talking:false,audio:null,edgeFailed:false,stopWaiting:false};
-function msg(t){$('status').textContent=t}
+const st={chat:null,threads:[],roster:null,agent:'main',busy:false,watch:false,refreshBusy:false,pcStatus:null,width:1280,height:800,
+abort:null,voice:false,muted:false,talking:false,rec:null,audio:null,edgeFailed:false};
+function notice(v){$('status').textContent=String(v)}
 async function api(route,method='GET',body){
- const r=await fetch('/dot/api/'+route,{method,credentials:'same-origin',cache:'no-store',
+ const res=await fetch('/dot/api/'+route,{method,credentials:'same-origin',cache:'no-store',
  headers:{'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
- const data=await r.json().catch(()=>({}));
- if(!r.ok)throw Error(data.error||'HTTP '+r.status);
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok)throw Error(data.error||'HTTP '+res.status);
  return data;
 }
-function showDrawer(which){for(const key of ['pc','agents'])$(key+'Drawer').classList.toggle('open',key===which&&!$(key+'Drawer').classList.contains('open'));st.watch=$('pcDrawer').classList.contains('open');if(st.watch){pcStatus();shot()}if($('agentsDrawer').classList.contains('open'))roster()}
-function closeDrawers(){for(const id of ['pcDrawer','agentsDrawer'])$(id).classList.remove('open');st.watch=false}
-function addMessage(role,text){
- const root=document.createElement('article');root.className='message '+role;
- const face=document.createElement('span');face.className='face';face.textContent=role==='user'?'◉':'✦';
- const body=document.createElement('div');body.className='content';
- const who=document.createElement('span');who.className='who';who.textContent=role==='user'?'Sen':'Dot';
- body.append(who,document.createTextNode(String(text||'')));root.append(face,body);
- if($('messages').querySelector('.welcome'))$('messages').replaceChildren();
- $('messages').append(root);$('messages').scrollTop=$('messages').scrollHeight;
+const stick=()=>{const area=$('chatArea');if(area.scrollHeight-area.scrollTop-area.clientHeight<240)area.scrollTop=area.scrollHeight};
+function turn(role,text){
+ const el=document.createElement('article');el.className='turn '+role;
+ const av=document.createElement('div');av.className='avatar';av.textContent=role==='user'?'●':'✦';
+ const wrap=document.createElement('div');wrap.className='bubble';
+ const who=document.createElement('div');who.className='speaker';who.textContent=role==='user'?'Sen':'Dot';
+ const content=document.createElement('div');content.className='content';content.textContent=text||'';
+ const stage=document.createElement('div');stage.className='stage';stage.style.display='none';
+ wrap.append(who,content,stage);el.append(av,wrap);
+ if($('hero'))$('hero').remove();$('messages').append(el);stick();
+ return {el,content,stage};
 }
-function remember(id){history.replaceState(null,'','/dot?chatId='+encodeURIComponent(id))}
+function reset(){const messages=$('messages');messages.replaceChildren()}
 async function threads(){
- try{const d=await api('threads');st.threads=d.threads||[];const container=$('threads');container.replaceChildren();
- for(const t of st.threads){const b=document.createElement('button');b.className='thread'+(t.id===st.chat?' active':'');b.textContent='◦  '+(t.title||'Yeni konuşma');b.onclick=()=>load(t.id);container.append(b)}}
- catch(e){msg('Konuşmalar yüklenemedi: '+e.message)}
+ const d=await api('threads');st.threads=d.threads||[];
+ const container=$('chats');container.replaceChildren();
+ for(const t of st.threads){const b=document.createElement('button');b.className='chatItem'+(t.id===st.chat?' active':'');b.textContent='◦  '+(t.title||'Yeni sohbet');b.onclick=()=>load(t.id);container.append(b)}
 }
 async function load(id){
- try{const t=await api('threads/'+encodeURIComponent(id));st.chat=t.id;st.agent='main';remember(t.id);
- $('chatTitle').textContent=t.title||'Yeni konuşma';$('messages').replaceChildren();
- for(const m of t.messages||[])if(m.role==='user'||m.role==='assistant')addMessage(m.role,m.content);
- if(!(t.messages||[]).length)addMessage('assistant','Yeni çalışma alanın hazır. Bir görev ver veya masaüstünü aç.');
- await threads();await roster();$('rail').classList.remove('open');msg('Sohbete bağlandı.')}
- catch(e){msg('Sohbet açılamadı: '+e.message)}
+ if(st.busy)return;
+ const t=await api('threads/'+encodeURIComponent(id));st.chat=t.id;st.agent='main';
+ history.replaceState(null,'','/dot?chatId='+encodeURIComponent(t.id));$('chatTitle').textContent=t.title||'Yeni sohbet';reset();
+ for(const m of t.messages||[])if(m.role==='assistant'||m.role==='user')turn(m.role,m.content);
+ if(!(t.messages||[]).length)turn('assistant','Çalışma alanın hazır. Bir görev vererek başlayabilirsin.');
+ await threads();await roster();$('sidebar').classList.remove('open');notice('Hazır.');
 }
-async function create(title='Yeni konuşma'){
- const t=await api('threads','POST',{title});st.chat=t.id;st.agent='main';remember(t.id);
- $('chatTitle').textContent=title;$('messages').replaceChildren();
- addMessage('assistant',t.pc?.status==='error'?'Sohbet hazır. PC hatası: '+t.pc.message:'Yeni çalışma alanını oluşturdum. PC arka planda hazırlanıyor.');
- await threads();await roster();$('rail').classList.remove('open');return t;
+async function create(){
+ const t=await api('threads','POST',{title:'Yeni sohbet'});
+ st.chat=t.id;st.agent='main';history.replaceState(null,'','/dot?chatId='+encodeURIComponent(t.id));
+ $('chatTitle').textContent='Yeni sohbet';reset();turn('assistant','Yeni çalışma alanı açıldı. PC ayrı olarak hazırlanıyor; sohbet için beklemene gerek yok.');
+ await threads();await roster();$('sidebar').classList.remove('open');return t;
 }
-async function sendText(value){
- const text=String(value||'').trim();if(!text||st.busy)return;
- st.busy=true;$('send').disabled=true;msg('Dot düşünüyor…');
- try{if(!st.chat)await create(text.slice(0,55));addMessage('user',text);
- const d=await api('message','POST',{threadId:st.chat,text});
- addMessage('assistant',d.content||'Yanıt gelmedi.');msg(d.saved?'Hazır':'Yanıt geldi ancak geçmiş kaydedilemedi.');
- if(st.voice&&d.content)await speak(d.content);await threads();await roster();
- }catch(e){addMessage('assistant','Bağlantı hatası: '+e.message);msg(e.message)}
- finally{st.busy=false;$('send').disabled=false;if(st.voice&&!st.muted)listen()}
+function parseSseBlock(block,handlers){
+ let type='message';const data=[];
+ for(const line of block.split('\n')){
+  if(line.startsWith('event:'))type=line.slice(6).trim();
+  if(line.startsWith('data:'))data.push(line.slice(5).trimStart());
+ }
+ if(!data.length)return false;
+ let value;try{value=JSON.parse(data.join('\n'))}catch{return false}
+ if(handlers[type])handlers[type](value);
+ return type==='done'||type==='error';
 }
-$('send').onclick=()=>{const t=$('prompt').value;$('prompt').value='';sendText(t)};
+async function sendText(text){
+ text=String(text||'').trim();if(!text||st.busy)return;
+ st.busy=true;$('send').style.display='none';$('stop').style.display='inline-block';
+ $('prompt').value='';notice('Bağlanıyor…');
+ const controller=new AbortController();st.abort=controller;
+ let assistant=null,received='',ended=false;
+ try{
+  if(!st.chat)await create();
+  turn('user',text);assistant=turn('assistant','');assistant.el.classList.add('streaming');
+  assistant.stage.style.display='block';assistant.stage.textContent='Model yanıtı bekleniyor…';
+  const res=await fetch('/dot/api/message/stream',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json','Accept':'text/event-stream'},
+   body:JSON.stringify({threadId:st.chat,text}),signal:controller.signal});
+  if(!res.ok)throw Error('Streaming HTTP '+res.status+': '+(await res.text()).slice(0,200));
+  if(!res.body)throw Error('Bu tarayıcı streaming desteklemiyor.');
+  const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';
+  const handlers={
+   token:o=>{received+=o.text||'';assistant.content.textContent=received;assistant.stage.style.display='none';notice('Dot yazıyor…');stick()},
+   status:o=>{assistant.stage.style.display='block';assistant.stage.textContent=o.text||'Araç kullanılıyor…';stick()},
+   done:o=>{ended=true;assistant.content.textContent=o.content||received;assistant.stage.style.display='none';
+      assistant.el.classList.remove('streaming');notice(o.saved?'Yanıt tamamlandı.':'Yanıt geldi, geçmiş kaydedilemedi.');if(st.voice&&o.content)speak(o.content)},
+   error:o=>{ended=true;throw Error(o.error||'Model akışı hata verdi')}
+  };
+  for(;;){
+   const {value,done}=await reader.read();if(done)break;
+   buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,'\n');
+   let end;while((end=buffer.indexOf('\n\n'))>=0){
+     const block=buffer.slice(0,end);buffer=buffer.slice(end+2);
+     parseSseBlock(block,handlers);
+   }
+  }
+  if(!ended)throw Error('Yanıt akışı beklenmedik şekilde kapandı.');
+  await threads();await roster();
+ }catch(e){
+  if(assistant){assistant.el.classList.remove('streaming');assistant.stage.style.display='none';
+    assistant.content.textContent=(received?received+'\n\n':'')+(e.name==='AbortError'?'[Akış kullanıcı tarafından durduruldu.]':'[Hata: '+e.message+']')}
+  notice(e.name==='AbortError'?'Durduruldu.':e.message)
+ }finally{
+  st.busy=false;st.abort=null;$('stop').style.display='none';$('send').style.display='inline-block';
+  if(st.voice&&!st.muted&&!st.talking)listen();
+ }
+}
+$('send').onclick=()=>$('prompt').value.trim()&&sendText($('prompt').value);
+$('stop').onclick=()=>{st.abort?.abort();notice('Akış durduruluyor…')};
 $('prompt').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('send').click()}};
-$('newChat').onclick=()=>create().catch(e=>msg(e.message));
-$('menuBtn').onclick=()=>$('rail').classList.toggle('open');
-$('pcBtn').onclick=()=>{if(!st.chat){msg('Önce yeni sohbet oluştur');return}showDrawer('pc')};
-$('agentsBtn').onclick=()=>{if(!st.chat){msg('Önce yeni sohbet oluştur');return}showDrawer('agents')};
-$('pcClose').onclick=closeDrawers;$('agentsClose').onclick=closeDrawers;
-
+document.querySelectorAll('[data-prompt]').forEach(b=>b.onclick=()=>{$('prompt').value=b.dataset.prompt;$('prompt').focus()});
+$('newChat').onclick=()=>create().catch(e=>notice(e.message));
+$('menu').onclick=()=>$('sidebar').classList.toggle('open');
+function drawer(id){for(const name of ['pcDrawer','agentsDrawer'])$(name).classList.toggle('open',name===id&&!$(name).classList.contains('open'));st.watch=$('pcDrawer').classList.contains('open');if(st.watch){pcStatus();shot()}if($('agentsDrawer').classList.contains('open'))roster()}
+$('pcBtn').onclick=()=>st.chat?drawer('pcDrawer'):notice('Önce yeni sohbet oluştur.');
+$('agentBtn').onclick=()=>st.chat?drawer('agentsDrawer'):notice('Önce yeni sohbet oluştur.');
+$('pcClose').onclick=()=>{drawer('pcDrawer')};
+$('agentsClose').onclick=()=>{drawer('agentsDrawer')};
 async function roster(){
  if(!st.chat)return;
  try{
-  const data=await api('chats/'+encodeURIComponent(st.chat)+'/agents');st.roster=data;
-  $('teamSummary').textContent='Ana PC: '+(data.mainPc?.status||'stopped')+' · Alt agent: '+data.agents.length+'/6';
-  $('agentTerminal').checked=data.allowExec===true;
-  $('aiDesktop').checked=data.allowDesktopAI===true;
-  const select=$('pcTarget');select.replaceChildren();
-  select.add(new Option('★ Ana Agent · '+data.mainPc.status,'main'));
-  for(const a of data.agents)select.add(new Option(a.name+' · '+(a.pc?.status||'stopped'),a.id));
-  if(!Array.from(select.options).some(x=>x.value===st.agent))st.agent='main';select.value=st.agent;
+  const d=await api('chats/'+st.chat+'/agents');st.roster=d;
+  $('teamSummary').textContent='Ana bilgisayar: '+d.mainPc.status+' · Alt agent: '+d.agents.length+'/6';
+  $('agentTerminal').checked=d.allowExec===true;$('aiDesktop').checked=d.allowDesktopAI===true;
+  const sel=$('pcTarget');sel.replaceChildren();sel.add(new Option('★ Ana agent · '+d.mainPc.status,'main'));
+  for(const a of d.agents)sel.add(new Option(a.name+' · '+a.pc.status,a.id));
+  if(!Array.from(sel.options).some(x=>x.value===st.agent))st.agent='main';sel.value=st.agent;
   const cards=$('agentCards');cards.replaceChildren();
-  for(const a of data.agents){
-   const box=document.createElement('section');box.className='agent';
-   const h=document.createElement('h3');h.textContent=a.name+' · '+(a.pc?.status||'stopped');box.append(h);
-   const p=document.createElement('p');p.textContent=a.task;box.append(p);
-   const row=document.createElement('div');row.className='row';
-   const check=document.createElement('input');check.type='checkbox';check.dataset.agent=a.id;
-   const label=document.createElement('label');label.className='checkbox';label.append(check,document.createTextNode('Paralel seç'));row.append(label);
-   const pc=document.createElement('button');pc.className='small';pc.textContent='▣ PC';pc.onclick=()=>{st.agent=a.id;$('pcTarget').value=a.id;showDrawer('pc')};row.append(pc);
-   if(a.report){const r=document.createElement('p');r.textContent='Rapor: '+a.report.slice(0,500);box.append(r)}
-   box.append(row);cards.append(box);
+  for(const a of d.agents){
+   const card=document.createElement('section');card.className='agentCard';
+   const name=document.createElement('strong');name.textContent=a.name+' · '+a.pc.status;card.append(name);
+   const task=document.createElement('p');task.textContent=a.task;card.append(task);
+   const line=document.createElement('div');line.className='row';
+   const tick=document.createElement('input');tick.type='checkbox';tick.dataset.agent=a.id;
+   const label=document.createElement('label');label.className='check';label.append(tick,document.createTextNode('Paralel'));line.append(label);
+   const pc=document.createElement('button');pc.className='sm';pc.textContent='▣ PC';pc.onclick=()=>{st.agent=a.id;$('pcTarget').value=a.id;drawer('pcDrawer')};line.append(pc);card.append(line);
+   if(a.report){const report=document.createElement('p');report.textContent='Rapor: '+a.report.slice(0,450);card.append(report)}
+   cards.append(card);
   }
- }catch(e){$('teamSummary').textContent='Agent durumu: '+e.message}
+ }catch(e){$('teamSummary').textContent=e.message}
 }
 $('addAgent').onclick=async()=>{
- const task=$('agentTask').value.trim();if(!task||!st.chat){$('agentLog').textContent='Önce görev yaz ve sohbet oluştur.';return}
- $('addAgent').disabled=true;
- try{const r=await api('chats/'+st.chat+'/agents','POST',{name:$('agentName').value||'Alt Agent',task});
- $('agentTask').value='';$('agentLog').textContent='Agent oluşturuldu: '+r.agents.map(a=>a.name+' · '+a.pc.status).join(', ');await roster()}
- catch(e){$('agentLog').textContent=e.message}finally{$('addAgent').disabled=false}
+ const task=$('agentTask').value.trim();if(!st.chat||!task)return;
+ $('addAgent').disabled=true;try{
+ const r=await api('chats/'+st.chat+'/agents','POST',{name:$('agentName').value||'Alt Agent',task});
+ $('agentTask').value='';$('agentLog').textContent='Agent oluşturuldu: '+r.agents.map(a=>a.name).join(', ');await roster();
+ }catch(e){$('agentLog').textContent=e.message}finally{$('addAgent').disabled=false}
 };
 async function waitForPcs(ids){
- const deadline=Date.now()+180000;st.stopWaiting=false;
- while(Date.now()<deadline){
-  if(st.stopWaiting)throw Error('Bekleme iptal edildi.');
-  const d=await api('chats/'+st.chat+'/agents');
-  const active=ids.map(id=>d.agents.find(a=>a.id===id));
-  if(active.some(a=>!a))throw Error('Agent bulunamadı');
-  if(active.some(a=>a.pc.status==='error'))throw Error('Agent PC başlatma hatası');
-  const stopped=active.filter(a=>['stopped','stale'].includes(a.pc.status));
-  for(const a of stopped)await api('pc/start','POST',{chatId:st.chat,agentId:a.id});
-  const waiting=active.filter(a=>a.pc.status!=='running');
+ const until=Date.now()+180000;
+ while(Date.now()<until){
+  const d=await api('chats/'+st.chat+'/agents');const selected=ids.map(id=>d.agents.find(a=>a.id===id));
+  if(selected.some(a=>!a))throw Error('Agent bulunamadı.');
+  if(selected.some(a=>a.pc.status==='error'))throw Error('PC başlatma hatası.');
+  for(const a of selected.filter(a=>['stopped','stale'].includes(a.pc.status)))await api('pc/start','POST',{chatId:st.chat,agentId:a.id});
+  const waiting=selected.filter(a=>a.pc.status!=='running');
   if(!waiting.length)return;
-  $('agentLog').textContent='Bilgisayarlar hazırlanıyor: '+waiting.map(a=>a.name+' · '+a.pc.status).join(', ');
+  $('agentLog').textContent='PC hazırlanıyor: '+waiting.map(a=>a.name).join(', ');
   await new Promise(r=>setTimeout(r,5000));
  }
- throw Error('PC zaman aşımı. Görevi bilgisayar beklemeden çalıştırabilirsin.');
+ throw Error('Bilgisayar 3 dakikada hazır olmadı. PC beklemeden model yanıtı alabilirsin.');
 }
 $('runAgents').onclick=async()=>{
  const ids=Array.from(document.querySelectorAll('input[data-agent]:checked')).map(e=>e.dataset.agent);
  if(!ids.length||ids.length>3){$('agentLog').textContent='1–3 agent seç.';return}
- $('runAgents').disabled=true;
- try{if($('waitForPc').checked)await waitForPcs(ids);
- $('agentLog').textContent='Paralel modeller çalışıyor…';
- const r=await api('chats/'+st.chat+'/agents/run','POST',{agentIds:ids});
- $('agentLog').textContent=r.reports.map(x=>(x.report||x.error||'Boş yanıt')).join('\n\n');await roster();
+ $('runAgents').disabled=true;try{
+  if($('waitForPc').checked)await waitForPcs(ids);
+  $('agentLog').textContent='Alt agentlar eşzamanlı çalışıyor…';
+  const r=await api('chats/'+st.chat+'/agents/run','POST',{agentIds:ids});
+  $('agentLog').textContent=r.reports.map(x=>x.report||x.error||'Boş rapor').join('\n\n');await roster();
  }catch(e){$('agentLog').textContent=e.message}finally{$('runAgents').disabled=false}
 };
-async function setConsent(key,enabled){
- if(enabled&&!confirm('Bu sohbette AI agentlarına '+(key==='allowDesktopAI'?'masaüstünde fare/klavye':'terminal')+' yetkisi verilsin mi?'))return false;
- const v=await api('chats/'+st.chat+'/agents/permissions','POST',{[key]:enabled});st.roster=v;return true;
-}
-for(const [element,key] of [['agentTerminal','allowExec'],['aiDesktop','allowDesktopAI']]){
- $(element).onchange=async e=>{const checked=e.target.checked;
-  try{if(!await setConsent(key,checked))e.target.checked=false}
-  catch(err){e.target.checked=!checked;$('agentLog').textContent=err.message}
- };
+for(const [id,key] of [['agentTerminal','allowExec'],['aiDesktop','allowDesktopAI']]){
+ $(id).onchange=async e=>{const selected=e.target.checked;try{
+  if(selected&&!confirm('Bu sohbet için AI '+(key==='allowExec'?'terminal':'masaüstü')+' kontrolüne izin verilsin mi?')){e.target.checked=false;return}
+  await api('chats/'+st.chat+'/agents/permissions','POST',{[key]:selected});
+ }catch(err){e.target.checked=!selected;$('agentLog').textContent=err.message}}
 }
 function pcBody(extra={}){return {chatId:st.chat,agentId:st.agent,...extra}}
 async function pcAction(route,extra={}){
  try{const r=await api('pc/'+route,'POST',pcBody(extra));
-  if(r.status){$('pcLog').textContent=r.status+' · '+(r.message||'');await pcStatus()}
-  else if(r.base64){presentShot(r)}
-  else $('pcLog').textContent=JSON.stringify(r,null,2).slice(0,14000);
+  if(r.base64)present(r);else $('pcLog').textContent=JSON.stringify(r,null,2).slice(0,12000);
   return r;
- }catch(e){$('pcLog').textContent='PC: '+e.message;return null}
+ }catch(e){$('pcLog').textContent='Hata: '+e.message;return null}
 }
 async function pcStatus(){
  if(!st.chat)return;
  try{const r=await api('pc/status?chatId='+encodeURIComponent(st.chat)+'&agentId='+encodeURIComponent(st.agent));
-  st.pcStatus=r;$('pcState').textContent=r.status||'stopped';$('pcDescription').textContent=r.message||'PC hazır olunca masaüstü görüntülenir.';
-  $('pcDot').className='dot '+(r.status==='running'?'ready':'wait');
-  if(r.status!=='running'){$('screen').style.display='none';$('desktopPlaceholder').style.display='block'}
- }catch(e){$('pcState').textContent='Bağlantı hatası';$('pcDescription').textContent=e.message}
+  st.pcStatus=r;$('pcState').textContent=(r.status||'stopped')+' · '+(r.message||'');
+  if(r.status!=='running'){$('screen').style.display='none';$('emptyScreen').style.display='block'}
+ }catch(e){$('pcState').textContent=e.message}
 }
-function presentShot(r){if(!r.base64||!(/^[A-Za-z0-9+/=]+$/).test(r.base64))return;
- $('screen').src='data:image/png;base64,'+r.base64;$('screen').style.display='block';$('desktopPlaceholder').style.display='none';
- st.width=r.width||1280;st.height=r.height||800;$('frameTime').textContent=new Date().toLocaleTimeString('tr-TR');
+function present(r){if(!/^[A-Za-z0-9+/=]+$/.test(r.base64||''))return;
+ st.width=r.width||1280;st.height=r.height||800;$('screen').src='data:image/png;base64,'+r.base64;
+ $('screen').style.display='block';$('emptyScreen').style.display='none';
 }
 async function shot(){if(!st.chat||!st.watch)return;
- try{const r=await api('pc/desktop/screenshot','POST',pcBody());presentShot(r)}
- catch(e){$('desktopPlaceholder').textContent='Masaüstü bekleniyor: '+e.message}
+ try{const r=await api('pc/desktop/screenshot','POST',pcBody());present(r)}
+ catch(e){$('emptyScreen').textContent='PC bekleniyor · '+e.message}
 }
 $('pcTarget').onchange=e=>{st.agent=e.target.value;pcStatus();shot()};
-$('pcStart').onclick=async()=>{await pcAction('start');await roster()};
-$('pcStop').onclick=async()=>{if(confirm('Bu bilgisayar kapatılsın ve şifreli dosyalar kaydedilsin mi?')){await pcAction('stop');await roster()}};
+$('pcStart').onclick=async()=>{await pcAction('start');pcStatus()};
+$('pcStop').onclick=async()=>{if(confirm('PC durdurulsun ve şifreli yedeği kaydedilsin mi?')){await pcAction('stop');pcStatus()}};
 $('refresh').onclick=()=>{pcStatus();shot()};
-async function inputDesktop(action,fields={}){return pcAction('desktop/action',{action,...fields})}
-$('desktop').onclick=async e=>{
- if(e.target!==$('screen')||!st.width)return;
+$('screen').onclick=async e=>{
  const r=$('screen').getBoundingClientRect();
- const x=Math.max(0,Math.min(st.width-1,Math.floor((e.clientX-r.left)*st.width/r.width)));
- const y=Math.max(0,Math.min(st.height-1,Math.floor((e.clientY-r.top)*st.height/r.height)));
- await inputDesktop('click',{x,y});await shot();
+ const x=Math.min(st.width-1,Math.max(0,Math.floor((e.clientX-r.left)*st.width/r.width)));
+ const y=Math.min(st.height-1,Math.max(0,Math.floor((e.clientY-r.top)*st.height/r.height)));
+ await pcAction('desktop/action',{action:'click',x,y});shot();
 };
-$('scrollUp').onclick=async()=>{await inputDesktop('scroll',{direction:'up',steps:4});await shot()};
-$('scrollDown').onclick=async()=>{await inputDesktop('scroll',{direction:'down',steps:4});await shot()};
-$('typeButton').onclick=async()=>{await inputDesktop('type',{text:$('typeText').value});await shot()};
-for(const [id,key] of [['enter','Return'],['tab','Tab'],['escape','Escape'],['ctrlL','ctrl+l']]){
- $(id).onclick=async()=>{await inputDesktop('key',{key});await shot()}
+for(const [id,action,extra] of [['scrollUp','scroll',{direction:'up',steps:3}],['scrollDown','scroll',{direction:'down',steps:3}],['enter','key',{key:'Return'}],['tab','key',{key:'Tab'}]]){
+ $(id).onclick=async()=>{await pcAction('desktop/action',{action,...extra});shot()}
 }
-$('visit').onclick=async()=>{await pcAction('navigate',{url:$('url').value});await shot()};
-$('exec').onclick=async()=>{
- const command=$('command').value.trim();
- if(!command||!confirm('Komut yalnızca seçili GitHub PC üzerinde çalıştırılacak:\n'+command))return;
- await pcAction('exec',{command,timeoutMs:20000});await shot();
-};
-setInterval(async()=>{if(st.watch&&!document.hidden&&!st.refreshBusy){st.refreshBusy=true;try{await pcStatus();if(st.pcStatus?.status==='running')await shot()}finally{st.refreshBusy=false}}},5000);
-// Lightweight optional voice call. No local AI weights; Edge neural cloud voice
-// with browser voice fallback; recognition support varies by Android browser.
-function endCall(){st.voice=false;st.recognizer?.abort();if(st.audio)st.audio.pause();if('speechSynthesis' in window)speechSynthesis.cancel();$('callOverlay').classList.remove('open')}
-function listen(){if(!st.voice||st.muted||st.talking)return;
- const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;
- if(!Rec){$('callText').textContent='Bu tarayıcıda konuşma tanıma yok. Mesaj kutusunu kullanabilirsin.';return}
- const r=new Rec();st.recognizer=r;r.lang='tr-TR';r.interimResults=true;let final='';
- r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)final+=e.results[i][0].transcript;
- else $('callText').textContent=e.results[i][0].transcript}};
- r.onerror=e=>$('callText').textContent='Mikrofon: '+e.error;
- r.onend=()=>{if(final.trim()&&st.voice){$('callText').textContent=final;sendText(final)}else if(st.voice&&!st.muted&&!st.talking)setTimeout(listen,800)};
- try{r.start();$('callText').textContent='Seni dinliyorum…'}catch(e){$('callText').textContent=e.message}
-}
-async function deviceVoice(text){if(!('speechSynthesis' in window))return;
- await new Promise(done=>{const u=new SpeechSynthesisUtterance(text.slice(0,650));u.lang='tr-TR';u.onend=done;u.onerror=done;speechSynthesis.cancel();speechSynthesis.speak(u);setTimeout(done,20000)});
+$('typeButton').onclick=async()=>{await pcAction('desktop/action',{action:'type',text:$('typeText').value});shot()};
+$('visit').onclick=async()=>{await pcAction('navigate',{url:$('url').value});shot()};
+$('exec').onclick=async()=>{const command=$('command').value.trim();if(command&&confirm('Yalnızca seçili PC üzerinde çalıştırılsın mı?\n'+command)){await pcAction('exec',{command,timeoutMs:18000});shot()}};
+setInterval(async()=>{if(st.watch&&!document.hidden&&!st.refreshBusy){st.refreshBusy=true;try{await pcStatus();if(st.pcStatus?.status==='running')await shot()}finally{st.refreshBusy=false}}},6500);
+// Audio remains optional; browser microphone recognition + remote low-RAM neural TTS.
+function stopCall(){st.voice=false;st.rec?.abort();st.audio?.pause();speechSynthesis?.cancel?.();$('callOverlay').classList.remove('open')}
+function listen(){if(!st.voice||st.muted||st.talking||st.busy)return;
+ const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Rec){$('callText').textContent='Tarayıcı konuşma tanıma desteklemiyor.';return}
+ const rec=new Rec();st.rec=rec;rec.lang='tr-TR';let heard='';
+ rec.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)heard+=e.results[i][0].transcript;
+ $('callText').textContent=heard||'Dinleniyor…'};
+ rec.onend=()=>{if(heard.trim()&&st.voice)sendText(heard);else if(st.voice&&!st.muted)setTimeout(listen,650)};
+ rec.onerror=e=>$('callText').textContent=e.error;
+ try{rec.start()}catch(e){$('callText').textContent=e.message}
 }
 async function speak(text){st.talking=true;
- try{let used=false;
- if($('voice').value!=='device'&&!st.edgeFailed){
-  try{const r=await fetch('/dot/api/tts',{method:'POST',credentials:'same-origin',
-   headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text.slice(0,900),voice:$('voice').value})});
-   if(!r.ok)throw Error('TTS unavailable');
-   const blob=await r.blob();if(blob.size<500)throw Error('Empty audio');
-   const url=URL.createObjectURL(blob);const audio=new Audio(url);st.audio=audio;
-   try{await new Promise((ok,no)=>{audio.onended=ok;audio.onerror=no;audio.play().catch(no)});used=true}
-   finally{URL.revokeObjectURL(url);st.audio=null}
-  }catch(e){st.edgeFailed=true}
- }
- if(!used)await deviceVoice(text);
- }finally{st.talking=false}
+ try{
+  if($('voice').value!=='device'&&!st.edgeFailed){
+   try{const r=await fetch('/dot/api/tts',{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text.slice(0,1000),voice:$('voice').value})});
+    if(!r.ok)throw Error('TTS');
+    const blob=await r.blob(),url=URL.createObjectURL(blob),audio=new Audio(url);st.audio=audio;
+    try{await new Promise((ok,no)=>{audio.onended=ok;audio.onerror=no;audio.play().catch(no)});return}
+    finally{st.audio=null;URL.revokeObjectURL(url)}
+   }catch(e){st.edgeFailed=true}
+  }
+  if('speechSynthesis' in window)await new Promise(done=>{
+   const u=new SpeechSynthesisUtterance(text.slice(0,1000));u.lang='tr-TR';u.onend=done;u.onerror=done;
+   speechSynthesis.cancel();speechSynthesis.speak(u);setTimeout(done,23000)});
+ }finally{st.talking=false;if(st.voice&&!st.muted)listen()}
 }
 $('callBtn').onclick=()=>{st.voice=true;st.muted=false;$('callOverlay').classList.add('open');listen()};
-$('hangup').onclick=endCall;
-$('mute').onclick=()=>{st.muted=!st.muted;$('mute').textContent=st.muted?'🎙 Mikrofonu aç':'🎙 Mikrofonu kapat';
- if(st.muted)st.recognizer?.abort();else listen()};
-(async()=>{await threads();const wanted=new URLSearchParams(location.search).get('chatId');
- const choice=st.threads.find(t=>t.id===wanted)||st.threads[0];if(choice)await load(choice.id)})();
+$('hangup').onclick=stopCall;$('mute').onclick=()=>{st.muted=!st.muted;if(st.muted)st.rec?.abort();else listen();$('mute').textContent=st.muted?'🎙 Aç':'🎙 Sustur'};
+(async()=>{try{await threads();const wanted=new URLSearchParams(location.search).get('chatId');const selected=st.threads.find(t=>t.id===wanted)||st.threads[0];if(selected)await load(selected.id)}catch(e){notice(e.message)}})();
 })();
 </script></body></html>`;
-return new Response(HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store",
-"X-Content-Type-Options":"nosniff","X-Frame-Options":"DENY","Referrer-Policy":"no-referrer",
-"Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'"}});
+return new Response(HTML,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'"}});
 }
