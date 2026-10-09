@@ -1,0 +1,51 @@
+name: Build Cached Dot Desktop Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "github-runtime/metodbox-desktop.ts"
+      - "github-runtime/patch-metodbox-desktop.py"
+      - ".github/workflows/build-dot-desktop-image.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: dot-desktop-prebuild
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare pinned OpenBot source and Metodbox overlay
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/metodbox-desktop-src
+          git -C /tmp/metodbox-desktop-src fetch --depth 1 origin aff4981e0734f15ff2fc68c86a32f765e0cae2b2
+          git -C /tmp/metodbox-desktop-src checkout --detach aff4981e0734f15ff2fc68c86a32f765e0cae2b2
+          python3 github-runtime/patch-metodbox-desktop.py /tmp/metodbox-desktop-src
+      - name: Authenticate with GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - uses: docker/setup-buildx-action@v3
+      - name: Build once and publish image for all PC launches
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/metodbox-desktop-src
+          file: /tmp/metodbox-desktop-src/agent-computer/Dockerfile
+          push: true
+          tags: ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:openbox-v1
+          cache-from: type=gha,scope=dot-desktop
+          cache-to: type=gha,mode=max,scope=dot-desktop
+      - name: Summary
+        run: |
+          echo "### Cached Linux PC image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "PC launch will try GHCR pull first, then build locally only if registry is unavailable." >> "$GITHUB_STEP_SUMMARY"
