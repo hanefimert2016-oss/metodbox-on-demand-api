@@ -176,15 +176,27 @@ set_state "starting" "Şifreli GitHub depolaması hazırlanıyor."
 prepare_data_branch
 restore_state
 
-set_state "starting" "OpenBot agent-computer imajı hazırlanıyor."
-rm -rf /tmp/openbot-agent-source
-git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/openbot-agent-source
-git -C /tmp/openbot-agent-source checkout "$UPSTREAM_COMMIT"
-# Add our own tiny Linux desktop and authenticated desktop I/O endpoints.
-# The original OpenBot computer still handles browser, terminal and storage.
-python3 "$PWD/github-runtime/patch-metodbox-desktop.py" /tmp/openbot-agent-source
-
-docker build   -f /tmp/openbot-agent-source/agent-computer/Dockerfile   -t "metodbox-agent-computer:$UPSTREAM_COMMIT"   /tmp/openbot-agent-source
+# The prebuilt image is shared between all chat/agent PCs. Pulling a pinned
+# version avoids a full Playwright/Chromium installation + Docker rebuild.
+# The image is created separately by build-dot-desktop-image.yml.
+IMAGE="ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:openbox-v1"
+set_state "starting" "Hazır masaüstü imajı indiriliyor (yeni derleme gerekmiyor)."
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+  printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-hanefimert2016-oss}" --password-stdin >/dev/null 2>&1 || true
+fi
+if docker pull "$IMAGE"; then
+  echo "::notice::Cached desktop image ready, skipping OpenBot clone and Docker build."
+else
+  echo "::warning::Cached image is not yet available. Using one-off fallback build."
+  set_state "starting" "İlk kurulum: hazır imaj bulunamadı, masaüstü bir kez derleniyor."
+  rm -rf /tmp/openbot-agent-source
+  git clone --filter=blob:none --no-checkout https://github.com/CopilotKit/OpenBot.git /tmp/openbot-agent-source
+  git -C /tmp/openbot-agent-source checkout "$UPSTREAM_COMMIT"
+  python3 "$PWD/github-runtime/patch-metodbox-desktop.py" /tmp/openbot-agent-source
+  docker build -f /tmp/openbot-agent-source/agent-computer/Dockerfile \
+    -t "metodbox-agent-computer:$UPSTREAM_COMMIT" /tmp/openbot-agent-source
+  IMAGE="metodbox-agent-computer:$UPSTREAM_COMMIT"
+fi
 
 COMPUTER_TOKEN="$(derive_computer_token)"
 CONTAINER="metodbox-agentpc-${AGENT_ID}"
@@ -195,7 +207,7 @@ set_state "starting" "Ajan için izole Chromium, terminal ve workspace başlatı
 # Never globally chmod 777: browser profiles may hold login credentials.
 sudo chown -R 0:0 "$WORKSPACE" "$PROFILES"
 sudo chmod u+rwx "$WORKSPACE" "$PROFILES"
-docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BROWSER_MODE=headed   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "metodbox-agent-computer:$UPSTREAM_COMMIT" >/dev/null
+docker run -d   --name "$CONTAINER"   --cap-drop ALL   --security-opt no-new-privileges:true   --pids-limit 512   --shm-size 1g   --memory 6g   -p 127.0.0.1:4100:4100   -e COMPUTER_TOKEN="$COMPUTER_TOKEN"   -e COMPUTER_BROWSER_MODE=headed   -e COMPUTER_BOT_ID="$AGENT_ID"   -e EGRESS_POLICY_REQUIRED=0   -e WORKSPACE_DIR=/workspace   -e PROFILES_DIR=/profiles   -v "$WORKSPACE:/workspace"   -v "$PROFILES:/profiles"   "$IMAGE" >/dev/null
 
 for _ in $(seq 1 120); do
   if curl -fsS --max-time 3 http://127.0.0.1:4100/health >/dev/null 2>&1; then
