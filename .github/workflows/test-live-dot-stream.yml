@@ -1,0 +1,89 @@
+name: Test Live Dot Streaming
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/test-live-dot-stream.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  streaming:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    env:
+      PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Confirm real GPT+ streaming and encrypted persistence
+        run: |
+          node --input-type=module <<'JS'
+          const base="https://metodbox-direct-api.hanefimert2016.workers.dev";
+          const password=process.env.PORTAL_PASSWORD;
+          if(!password)throw Error("PORTAL_PASSWORD secret unavailable");
+          const login=await fetch(base+"/apps/login",{method:"POST",redirect:"manual",
+            headers:{"Content-Type":"application/x-www-form-urlencoded",Origin:base},
+            body:new URLSearchParams({username:"admin",password,return_to:"/dot"}),
+            signal:AbortSignal.timeout(30000)});
+          if(login.status!==303)throw Error("Login HTTP "+login.status);
+          const cookie=login.headers.get("set-cookie")?.split(";")[0];
+          const headers={Cookie:cookie,Origin:base,"Content-Type":"application/json"};
+          async function api(route,method="GET",body) {
+            const r=await fetch(base+"/dot/api/"+route,{method,headers,
+              ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(60000)});
+            const data=await r.json().catch(()=>({}));
+            if(!r.ok)throw Error(route+" HTTP "+r.status+": "+(data.error||""));
+            return data;
+          }
+          let id;
+          try{
+            const t=await api("threads","POST",{title:"Live streaming test"});
+            id=t.id;
+            const t0=Date.now();
+            const r=await fetch(base+"/dot/api/message/stream",{method:"POST",headers,
+              body:JSON.stringify({threadId:id,
+                text:"Türkçe, iki cümle halinde bir uzay istasyonunu tarif et. Bilgisayar aracı kullanma."}),
+              signal:AbortSignal.timeout(140000)});
+            if(!r.ok)throw Error("Stream endpoint HTTP "+r.status);
+            if(!r.headers.get("content-type")?.includes("text/event-stream"))throw Error("SSE Content-Type missing");
+            const reader=r.body.getReader(),decoder=new TextDecoder();
+            let buffer="",tokens=[],status=[],complete=null,errors=[],firstMs=null,received=0;
+            for(;;){
+              const {done,value}=await reader.read();if(done)break;
+              received+=value.byteLength;
+              buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,"\n");
+              let at;
+              while((at=buffer.indexOf("\n\n"))>=0) {
+                const block=buffer.slice(0,at);buffer=buffer.slice(at+2);
+                const kind=block.split("\n").find(s=>s.startsWith("event:"))?.slice(6).trim();
+                const data=block.split("\n").find(s=>s.startsWith("data:"))?.slice(5).trim();
+                if(!data)continue;
+                let payload;try{payload=JSON.parse(data)}catch{continue}
+                if(kind==="token"){tokens.push(payload.text||"");if(firstMs===null)firstMs=Date.now()-t0}
+                if(kind==="status")status.push(payload.text);
+                if(kind==="done")complete=payload;
+                if(kind==="error")errors.push(payload.error);
+              }
+            }
+            if(errors.length)throw Error("Streaming error: "+errors.join(", "));
+            if(!complete||!complete.saved)throw Error("Stream did not persist: "+JSON.stringify(complete));
+            if(tokens.join("")!==complete.content)throw Error("Final answer differs from streamed tokens");
+            const stored=await api("threads/"+id);
+            if(!stored.messages?.some(m=>m.role==="assistant"&&m.content===complete.content))
+              throw Error("Stream answer not persisted");
+            console.log("LIVE_SSE_OK tokenEvents="+tokens.length+
+              " firstTokenMs="+firstMs+" totalBytes="+received+
+              " statusEvents="+status.length+" answerChars="+complete.content.length);
+            if(tokens.length<2)console.log("WARNING_UPSTREAM_SENT_SINGLE_CHUNK (not fabricated)");
+          }finally{
+            if(id){
+              try{await api("pc/stop","POST",{chatId:id,agentId:"main"})}catch(e){console.log("PC cleanup warning: "+e.message)}
+              try{await api("threads/"+id,"DELETE")}catch(e){console.log("Thread cleanup warning: "+e.message)}
+            }
+          }
+          JS
