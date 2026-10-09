@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - "github-runtime/metodbox-desktop.ts"
+      - "github-runtime/metodbox-start-xfce.sh"
+      - "github-runtime/metodbox-wallpaper.svg"
       - "github-runtime/patch-metodbox-desktop.py"
       - ".github/workflows/build-dot-desktop-image.yml"
 
@@ -42,10 +44,10 @@ jobs:
           context: /tmp/metodbox-desktop-src
           file: /tmp/metodbox-desktop-src/agent-computer/Dockerfile
           push: true
-          tags: ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:openbox-v1
-          cache-from: type=gha,scope=dot-desktop
+          tags: ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:xfce-v2
+          cache-from: type=gha,scope=dot-xfce-v2
           cache-to: type=gha,mode=max,scope=dot-desktop
       - name: Summary
         run: |
-          echo "### Cached Linux PC image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Cached XFCE Linux PC image published" >> "$GITHUB_STEP_SUMMARY"
           echo "PC launch will try GHCR pull first, then build locally only if registry is unavailable." >> "$GITHUB_STEP_SUMMARY"
