@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: agent-pc-${{ github.event.client_payload.agent_id || inputs.agent_id }}
@@ -23,6 +24,7 @@ jobs:
     timeout-minutes: 350
     env:
       AGENT_ID: ${{ github.event.client_payload.agent_id || inputs.agent_id }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       AGENT_STORAGE_TOKEN: ${{ secrets.AGENT_STORAGE_TOKEN }}
       AGENT_STORAGE_REPO: hanefimert2016-oss/Metodbox-secret-system
       AGENT_STORAGE_BRANCH: agent-data
