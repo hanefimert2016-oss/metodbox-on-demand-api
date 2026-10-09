@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+<defs>
+<linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0c1725"/><stop offset=".5" stop-color="#162a3a"/><stop offset="1" stop-color="#12352f"/></linearGradient>
+<radialGradient id="orb"><stop stop-color="#c7f38b" stop-opacity=".45"/><stop offset="1" stop-color="#4ed2c5" stop-opacity="0"/></radialGradient>
+<linearGradient id="ring" x1="0" x2="1"><stop stop-color="#95b9a3" stop-opacity=".36"/><stop offset="1" stop-color="#6a9abd" stop-opacity=".05"/></linearGradient>
+</defs>
+<rect width="1280" height="800" fill="url(#bg)"/>
+<circle cx="1020" cy="275" r="380" fill="url(#orb)"/>
+<g fill="none" stroke="url(#ring)" stroke-width="1.2">
+<circle cx="900" cy="330" r="190"/><circle cx="900" cy="330" r="270"/>
+<circle cx="900" cy="330" r="365"/>
+<path d="M600 150L1250 630M780-70L1260 430M670 680L1130 80"/>
+</g>
+<path d="M0 590C230 540 350 645 615 594S1025 570 1280 620V800H0Z" fill="#102a2c" opacity=".48"/>
+<text x="70" y="610" font-family="DejaVu Sans, sans-serif" font-size="44" letter-spacing="-1.5" font-weight="bold" fill="#edf9ef">metodbox<tspan fill="#c7f38b">.</tspan></text>
+<text x="72" y="645" font-family="DejaVu Sans,sans-serif" font-size="14" letter-spacing="3" fill="#a6c8be">DOT DESKTOP  /  XFCE</text>
+</svg>
