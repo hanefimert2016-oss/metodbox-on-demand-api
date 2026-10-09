@@ -179,8 +179,8 @@ restore_state
 # The prebuilt image is shared between all chat/agent PCs. Pulling a pinned
 # version avoids a full Playwright/Chromium installation + Docker rebuild.
 # The image is created separately by build-dot-desktop-image.yml.
-IMAGE="ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:openbox-v1"
-set_state "starting" "Hazır masaüstü imajı indiriliyor (yeni derleme gerekmiyor)."
+IMAGE="ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:xfce-v2"
+set_state "starting" "Hazır XFCE masaüstü indiriliyor (ilk imaj çekilişi)."
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-hanefimert2016-oss}" --password-stdin >/dev/null 2>&1 || true
 fi
@@ -201,7 +201,7 @@ fi
 COMPUTER_TOKEN="$(derive_computer_token)"
 CONTAINER="metodbox-agentpc-${AGENT_ID}"
 
-set_state "starting" "Ajan için izole Chromium, terminal ve workspace başlatılıyor."
+set_state "starting" "XFCE masaüstü, Chromium, terminal ve çalışma alanı açılıyor."
 # --cap-drop ALL removes root's DAC_OVERRIDE. Give the container's uid=0
 # ownership of ONLY the two dedicated bind-mount roots before starting it.
 # Never globally chmod 777: browser profiles may hold login credentials.
