@@ -12,6 +12,47 @@ Bu sürüm **kalıcı açık sunucu değildir**: Cloudflare Worker sohbeti açar
 
 Doğrulama: [İki gerçek GPT+ yanıtı ve şifreli geçmişin canlı testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818302431) · [agent çakışması, PC eskimesi ve mobil UI testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818520475).
 
+## Dot Studio v0.5 — gerçek streaming ve daha hızlı PC açılışı
+
+**Doğrudan aç:** https://metodbox-direct-api.hanefimert2016.workers.dev/dot
+
+- **Arayüz sıfırdan yenilendi:** Minimal koyu renkli Dot Studio, daha sade
+  sohbet alanı, ajan listesi, mobil yan panel, Linux masaüstü ve
+  yanıtı durdurma düğmesi.
+- **Gerçek model streaming:** `POST /dot/api/message/stream` konuşma ve araç
+  adımlarını SSE ile iletir. `event: token` her gerçek GPT+ akış parçasını
+  taşır, `event: status` bilgisayar aracı durumunu, `event: done`
+  tamamlanan yanıtın özel depoya yazılma sonucunu bildirir.
+  Akış `TextDecoder` ve `ReadableStream` ile telefonda kademeli çizilir.
+  Geriye dönük eski `POST /dot/api/message` JSON yolu saklıdır.
+- **Canlı akış doğrulaması:** Gerçek model yanıtı **98 token olayı** halinde
+  geldi; ilk metin parçası **3,64 saniye** sonra iletildi ve tam yanıt
+  şifreli konuşma geçmişine kaydedildi. Bu sayı test koşullarına özeldir.
+- **PC imajını her seferinde tekrar derlemiyor:** GitHub Actions
+  `build-dot-desktop-image.yml` yalnızca masaüstü kaynakları değiştiğinde
+  `ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:openbox-v1` imajını
+  oluşturup GHCR'a yayımlar. `launch-agent-pc.sh` imajı çekip çalıştırır.
+  İmaj erişilemezse güvenli eski kaynak derlemesi yedek olarak kalır.
+  İlk örnek testte imaj indirmeden PC hazır olana kadar yaklaşık **29 saniye**
+  ölçüldü. GitHub runner kuyruğu bu ölçüme dahil değildir.
+- **Sohbet, PC başlatmayı beklemiyor:** Yeni sohbet çağrısı Cloudflare
+  Worker'ın `waitUntil` mekanizmasıyla GitHub dispatch'i arka plana alır.
+  Her sohbet kendine özel bilgisayar kimliğini korur; masaüstü ekranı
+  ancak runner hazır olduğunda çalışır.
+- **Korunan mevcut sistem:** Her sohbet/alt agent PC'si ayrıdır; terminal ve
+  fare/klavye AI yetkileri güçlü portal şifresi ve kullanıcı onayı ister.
+  PC çalışma klasörleri ve Chromium profilleri, başarılı kontrol noktalarında
+  eski özel `Metodbox-secret-system` deposuna şifreli yedeklenir.
+
+**Gerçek testler:** [SSE test kaydı](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37882350657),
+[GHCR hazır PC test kaydı](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37882364903),
+[Streaming araç akışı ve arka plan PC testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-private-thread-storage.yml),
+[GitHub PC imajı yayını](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/build-dot-desktop-image.yml).
+
+Not: GitHub Actions gerçek zamanlı sürekli PC servisi değildir. Runner için
+başlangıç ve kuyruk gecikmeleri, çalışma süresi ve kota sınırları devam eder.
+Streaming yanıtı durdurulduğunda tamamlanmamış cevap geçmişe yazılmayabilir.
+
 ## Dot Studio — gerçek Linux masaüstü (v0.4)
 
 **Bağlantı:** [Metodbox Dot Studio](https://metodbox-direct-api.hanefimert2016.workers.dev/dot)
