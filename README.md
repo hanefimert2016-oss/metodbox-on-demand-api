@@ -12,6 +12,35 @@ Bu sürüm **kalıcı açık sunucu değildir**: Cloudflare Worker sohbeti açar
 
 Doğrulama: [İki gerçek GPT+ yanıtı ve şifreli geçmişin canlı testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818302431) · [agent çakışması, PC eskimesi ve mobil UI testleri](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/runs/37818520475).
 
+## Dot Desktop v0.6 — gerçek XFCE masaüstü
+
+Dot Studio'nun PC panelindeki Linux artık **Openbox değil; tam XFCE oturumu**dur.
+GitHub üzerinde geçici PC'ler için KDE Plasma yerine XFCE seçildi: daha az
+RAM/CPU ile gerçek pencereler, uygulama menüsü, görev çubuğu, dosya yöneticisi
+ve grafik terminal sunuyor.
+
+- **XFCE 4 / X11**: `xfce4-session`, `xfwm4`, `xfdesktop`, `xfce4-panel`.
+- **Uygulamalar**: Thunar, XFCE Terminal, Chromium; isteğe bağlı Whisker menüsü.
+- **Görünüm**: Arc-Dark, Papirus-Dark simgeler, Noto yazı tipi ve Metodbox
+  markalı masaüstü arka planı.
+- **Gerçek GUI I/O**: Aynı Xvfb ekranından `/desktop/screenshot` alınır,
+  `/desktop/click`, `/desktop/type`, `/desktop/key` ve `/desktop/scroll`
+  ile fare/klavye kontrolü korunur. Ek VNC/RDP portu açılmaz.
+- **Kalıcı ayarlar**: XFCE konfigürasyonu agent'a özel `/profiles/xfce-config`
+  dizinindedir. Önceki şifreli snapshot başarıyla kaydedilip geri yüklendiği
+  sürece kişisel ayarlar korunabilir. GHCR imajı
+  `ghcr.io/hanefimert2016-oss/metodbox-dot-desktop:xfce-v2` etiketiyle
+  ortak şekilde önceden hazırlanır, böylece her PC için XFCE baştan kurulmaz.
+
+**Önemli:** Daha ağır XFCE imajının ilk defa indirilmesi zaman alabilir;
+GitHub runner sırası ortadan kalkmaz. Halihazırda çalışan Openbox bilgisayarları
+yeniden başlatılana kadar eski masaüstünü göstermeye devam eder.
+Kısa portal şifresinin uzaktan fare/klavye komutlarını engelleyen güvenlik
+kuralı aynen geçerlidir.
+
+[Hazır XFCE imajının GitHub build'i](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/build-dot-desktop-image.yml) ·
+[Gerçek XFCE oturum, ekran ve kontrol testi](https://github.com/hanefimert2016-oss/metodbox-on-demand-api/actions/workflows/test-openbox-desktop.yml).
+
 ## Dot Studio v0.5 — gerçek streaming ve daha hızlı PC açılışı
 
 **Doğrudan aç:** https://metodbox-direct-api.hanefimert2016.workers.dev/dot
