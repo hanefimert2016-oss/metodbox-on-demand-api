@@ -260,7 +260,7 @@ $('visit').onclick=async()=>{await pcAction('navigate',{url:$('url').value});sho
 $('exec').onclick=async()=>{const command=$('command').value.trim();if(command&&confirm('Yalnızca seçili PC üzerinde çalıştırılsın mı?\n'+command)){await pcAction('exec',{command,timeoutMs:18000});shot()}};
 setInterval(async()=>{if(st.watch&&!document.hidden&&!st.refreshBusy){st.refreshBusy=true;try{await pcStatus();if(st.pcStatus?.status==='running')await shot()}finally{st.refreshBusy=false}}},6500);
 // Audio remains optional; browser microphone recognition + remote low-RAM neural TTS.
-function stopCall(){st.voice=false;st.rec?.abort();st.audio?.pause();speechSynthesis?.cancel?.();$('callOverlay').classList.remove('open')}
+function stopCall(){st.voice=false;st.rec?.abort();st.audio?.pause();if('speechSynthesis' in window)window.speechSynthesis.cancel();$('callOverlay').classList.remove('open')}
 function listen(){if(!st.voice||st.muted||st.talking||st.busy)return;
  const Rec=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Rec){$('callText').textContent='Tarayıcı konuşma tanıma desteklemiyor.';return}
  const rec=new Rec();st.rec=rec;rec.lang='tr-TR';let heard='';
