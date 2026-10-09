@@ -282,3 +282,69 @@ test("consented main AI can observe a screenshot then send real desktop click vi
     assert.match(result.data.content,/tıkladım/);
   }finally{globalThis.fetch=old}
 });
+
+test("streamed Dot tools execute before final answer and persist completed text",async()=>{
+  const github=stubGithub(),old=globalThis.fetch;
+  globalThis.fetch=github.fetch;
+  try{
+    const env=environment(),cookie=await login(env);
+    const created=await invoke(env,cookie,"POST","/dot/api/threads",{title:"Stream tools"});
+    assert.equal(created.response.status,201);
+    let count=0;
+    function events(choices){
+      return new Response(choices.map(c=>"data: "+JSON.stringify({choices:[{delta:c}]})+"\n\n").join("")+"data: [DONE]\n\n",
+        {headers:{"Content-Type":"text/event-stream"}});
+    }
+    const path="/dot/api/message/stream";
+    const stream=await handleDotRequest(apiReq("POST",path,
+      {threadId:created.data.id,text:"PC durumunu kontrol et."},cookie),env,
+      new URL(origin+path),async body=>{
+        assert.equal(body.stream,true);
+        count++;
+        if(count===1){
+          return events([{tool_calls:[{index:0,id:"call_pc",type:"function",function:{name:"dot_pc_status",arguments:"{}"}}]}]);
+        }
+        assert.ok(body.messages.some(x=>x.role==="tool"&&x.tool_call_id==="call_pc"));
+        return events([{content:"Bilgisayar "},{content:"durumu kontrol edildi."}]);
+      });
+    assert.equal(stream.status,200);
+    assert.match(stream.headers.get("content-type"),/text\/event-stream/);
+    const out=await stream.text();
+    assert.ok(out.includes("event: token"));
+    assert.ok(out.includes("event: done"));
+    assert.ok(out.includes("Bilgisayar "));
+    assert.equal(count,2);
+    const state=await invoke(env,cookie,"GET","/dot/api/threads/"+created.data.id);
+    assert.equal(state.data.messages.length,2);
+    assert.equal(state.data.messages[1].content,"Bilgisayar durumu kontrol edildi.");
+  }finally{globalThis.fetch=old}
+});
+
+test("chat creation does not wait for GitHub PC dispatch when Worker context exists",async()=>{
+  const stub=stubGithub(),old=globalThis.fetch;
+  let dispatchCompleted=false, pending=null;
+  globalThis.fetch=async(url,opts={})=>{
+    if(String(url).endsWith("/dispatches")){
+      await new Promise(resolve=>setTimeout(resolve,140));
+      dispatchCompleted=true;
+    }
+    return stub.fetch(url,opts);
+  };
+  try{
+    const env=environment(),cookie=await login(env);
+    const path="/dot/api/threads";
+    const started=Date.now();
+    const result=await handleDotRequest(apiReq("POST",path,{title:"Fast chat"},cookie),
+      env,new URL(origin+path),async()=>{},{
+        waitUntil(task){pending=task;}
+      });
+    assert.equal(result.status,201);
+    const data=await result.json();
+    assert.equal(data.pc.status,"requested");
+    assert.ok(Date.now()-started<140,"new chat must not wait for GitHub dispatch");
+    assert.equal(dispatchCompleted,false);
+    assert.ok(pending);
+    await pending;
+    assert.equal(dispatchCompleted,true);
+  }finally{globalThis.fetch=old}
+});
