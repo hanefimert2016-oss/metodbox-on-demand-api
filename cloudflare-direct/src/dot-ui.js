@@ -132,7 +132,8 @@ async function sendText(text){
   };
   for(;;){
    const {value,done}=await reader.read();if(done)break;
-   buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,'\n');
+   buffer+=decoder.decode(value,{stream:true});
+   buffer=buffer.replace(/\r\n/g,'\n');
    let end;while((end=buffer.indexOf('\n\n'))>=0){
      const block=buffer.slice(0,end);buffer=buffer.slice(end+2);
      parseSseBlock(block,handlers);
