@@ -63,7 +63,8 @@ export async function collectStreamCompletion(response,onToken=()=>{}) {
       if(done)break;
       totalBytes+=value.byteLength;
       if(totalBytes>900000)throw Error("Model stream is too large");
-      buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,"\n");
+      buffer+=decoder.decode(value,{stream:true});
+      buffer=buffer.replace(/\r\n/g,"\n");
       let stop;
       while((stop=buffer.indexOf("\n\n"))>=0) {
         await parseBlock(buffer.slice(0,stop));
