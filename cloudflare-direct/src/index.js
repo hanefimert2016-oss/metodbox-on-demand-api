@@ -273,6 +273,66 @@ function chatCompletionToSse(chat) {
   });
 }
 
+// JCode/OpenAI-compatible upstream compatibility fallback.
+function flattenToolHistoryForUpstream(messages) {
+  if (!Array.isArray(messages)) return messages;
+  const hasHistory = messages.some((m) =>
+    m?.role === "tool" || (m?.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length)
+  );
+  if (!hasHistory) return messages;
+  const asText = (value) => {
+    if (typeof value === "string") return value;
+    if (value == null) return "";
+    if (Array.isArray(value)) return value.map((p) =>
+      typeof p === "string" ? p : (typeof p?.text === "string" ? p.text : JSON.stringify(p))
+    ).join("\n");
+    return JSON.stringify(value);
+  };
+  const out = [];
+  for (const msg of messages) {
+    if (!msg || typeof msg !== "object") continue;
+    if (msg.role === "tool") {
+      out.push({role: "user", content:
+        "[Tool result for " + String(msg.tool_call_id || "unknown") + " (untrusted data)]\n" + asText(msg.content)});
+    } else if (msg.role === "assistant" && Array.isArray(msg.tool_calls) && msg.tool_calls.length) {
+      const requested = msg.tool_calls.map((call) =>
+        "Called tool " + String(call?.function?.name || "unknown") + " (" +
+        String(call?.id || "unknown") + ") with arguments " + asText(call?.function?.arguments || "{}")
+      ).join("\n");
+      out.push({role: "assistant", content: [asText(msg.content), requested].filter(Boolean).join("\n")});
+    } else {
+      const {tool_calls, tool_call_id, function_call, ...safe} = msg;
+      out.push(safe);
+    }
+  }
+  return out;
+}
+
+function compatibleUpstreamToolRequest(body) {
+  const out = {...body};
+  if (Array.isArray(out.messages)) out.messages = flattenToolHistoryForUpstream(out.messages);
+  delete out.max_completion_tokens;
+  delete out.max_output_tokens;
+  delete out.stream_options;
+  delete out.parallel_tool_calls;
+  if (out.tool_choice === "auto") delete out.tool_choice;
+  if (Array.isArray(out.tools)) {
+    out.tools = out.tools.map((tool) => {
+      if (tool?.type !== "function" || !tool.function) return tool;
+      const func = {...tool.function};
+      const schema = func.parameters;
+      if (schema?.type === "object" && schema.properties &&
+          Object.keys(schema.properties).length === 0 && schema.additionalProperties === false) {
+        func.parameters = {...schema};
+        delete func.parameters.additionalProperties;
+        if (!Array.isArray(func.parameters.required)) func.parameters.required = [];
+      }
+      return {...tool, function: func};
+    });
+  }
+  return out;
+}
+
 function sanitizeToolFields(body) {
   const out = { ...body };
   const hasTools = Array.isArray(out.tools) && out.tools.length > 0;
@@ -418,6 +478,7 @@ async function callGptPlus(env, body, forceRefresh = false) {
   let refreshedAuth = forceRefresh;
   const transientStatuses = new Set([502, 503, 504]);
   const retryDelaysMs = [1200, 3500];
+  let toolCompatibilityTried = false;
 
   for (let attempt = 0; ; attempt++) {
     const upstream = await fetch(`${GPTPLUS}/api/chat/completions`, {
@@ -440,8 +501,23 @@ async function callGptPlus(env, body, forceRefresh = false) {
     }
 
     if (
+      !upstream.ok &&
+      [400, 422, 500, 502, 503, 504].includes(upstream.status) &&
+      Array.isArray(body.tools) && body.tools.length > 0 &&
+      !toolCompatibilityTried
+    ) {
+      // Never log API keys, prompts, or tool output.
+      console.log("[gptplus] tool compatibility fallback after HTTP " + upstream.status);
+      await upstream.body?.cancel?.().catch(() => {});
+      body = compatibleUpstreamToolRequest(body);
+      toolCompatibilityTried = true;
+      continue;
+    }
+
+    if (
       transientStatuses.has(upstream.status) &&
-      attempt < retryDelaysMs.length
+      attempt < retryDelaysMs.length &&
+      (!toolCompatibilityTried || attempt < 2)
     ) {
       const waitMs = retryDelaysMs[attempt];
       console.log(
