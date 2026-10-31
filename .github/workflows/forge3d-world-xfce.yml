@@ -18,7 +18,7 @@ jobs:
       - name: Install Blender and XFCE
         run: |
           sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends blender xvfb dbus-x11 xfce4-session xfwm4 xfdesktop4 xfce4-panel xfconf scrot x11-utils libgl1-mesa-dri
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends blender xvfb dbus-x11 xfce4-session xfwm4 xfdesktop4 xfce4-panel xfconf scrot feh x11-utils libgl1-mesa-dri
           python -m pip install -r forge3d-world/requirements.txt
       - name: Build and quality-check real GLB
         run: |
@@ -42,8 +42,8 @@ jobs:
       - name: Screenshot real XFCE desktop
         run: |
           mkdir -p forge3d-world/outputs/xfce
-          (timeout 40s blender -t 2 forge3d-world/outputs/blender/AEGIS_Outpost.blend >/tmp/blender-gui.log 2>&1 || true) &
-          sleep 15
+          feh --auto-zoom --geometry 1130x745+75+26 forge3d-world/outputs/blender/AEGIS_Blender_Review.png >/tmp/forge3d-feh.log 2>&1 &
+          sleep 5
           scrot forge3d-world/outputs/xfce/XFCE_Desktop.png
           test -s forge3d-world/outputs/xfce/XFCE_Desktop.png
       - name: Upload generated GLB, blend, review, XFCE screenshot

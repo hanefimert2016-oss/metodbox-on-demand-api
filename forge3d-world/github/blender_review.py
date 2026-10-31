@@ -14,7 +14,7 @@ def main():
     bpy.context.scene.collection.objects.link(cam)
     cam.location=(135,-140,142)
     cam.rotation_euler=(Vector((0,0,2))-cam.location).to_track_quat("-Z","Y").to_euler()
-    camData.type="ORTHO";camData.ortho_scale=173
+    camData.type="ORTHO";camData.ortho_scale=238
     scene=bpy.context.scene;scene.camera=cam
     scene.render.engine="BLENDER_WORKBENCH"
     scene.display.shading.light="STUDIO"
@@ -23,6 +23,15 @@ def main():
     scene.render.resolution_percentage=100
     scene.render.image_settings.file_format="PNG"
     scene.render.filepath=str(folder/"AEGIS_Blender_Review.png")
+    for screen in bpy.data.screens:
+        for area in screen.areas:
+            if area.type=="VIEW_3D":
+                space=area.spaces.active
+                space.region_3d.view_location=(0,0,2)
+                space.region_3d.view_distance=174
+                space.region_3d.view_rotation=cam.rotation_euler.to_quaternion()
+                space.shading.type="SOLID"
+                space.shading.color_type="MATERIAL"
     bpy.ops.wm.save_as_mainfile(filepath=str(folder/"AEGIS_Outpost.blend"))
     bpy.ops.render.render(write_still=True)
     report={"version":bpy.app.version_string,"meshes":len(objects),"materials":len(bpy.data.materials),"render":scene.render.filepath}
