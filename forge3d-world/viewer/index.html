@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Forge3D / AEGIS Outpost</title><style>
+html,body{margin:0;height:100%;overflow:hidden;background:#071019;color:#e1f7ff;font:13px system-ui}header{position:fixed;left:24px;top:24px;z-index:1;background:#081925dd;padding:22px;border:1px solid #1c6677}
+b{font-size:22px}p{color:#8abccc}
+</style><header>FORGE3D WORLD STUDIO<br><b>AEGIS OUTPOST</b><p>Drag orbit • Wheel zoom • Right-drag pan</p><span id="status">LOADING GLB...</span></header>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+<script type="module">
+import * as T from "three";import{OrbitControls}from "three/addons/controls/OrbitControls.js";import{GLTFLoader}from "three/addons/loaders/GLTFLoader.js";
+const s=new T.Scene();s.background=new T.Color("#071019");const c=new T.PerspectiveCamera(45,innerWidth/innerHeight,.1,750);c.position.set(106,95,115);
+const r=new T.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);r.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(r.domElement);
+const o=new OrbitControls(c,r.domElement);o.enableDamping=true;o.target.set(0,3,0);s.add(new T.HemisphereLight(0xc3efff,0x17202b,2.1));
+const l=new T.DirectionalLight(0xffffff,3);l.position.set(65,110,95);s.add(l);
+new GLTFLoader().load("../outputs/AEGIS_Outpost.glb",g=>{s.add(g.scene);document.getElementById("status").textContent="REAL GLB LOADED"},undefined,e=>{document.getElementById("status").textContent="GLB missing: run generate.py";console.error(e)});
+addEventListener("resize",()=>{c.aspect=innerWidth/innerHeight;c.updateProjectionMatrix();r.setSize(innerWidth,innerHeight)});
+r.setAnimationLoop(()=>{o.update();r.render(s,c)});
+</script>
