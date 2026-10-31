@@ -1,0 +1,59 @@
+name: Forge3D Map Build and Real XFCE Review
+on:
+  workflow_dispatch:
+  push:
+    branches: [forge3d-world-xfce-20261031]
+    paths: ['forge3d-world/**', '.github/workflows/forge3d-world-xfce.yml']
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Blender and XFCE
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends blender xvfb dbus-x11 xfce4-session xfwm4 xfdesktop4 xfce4-panel xfconf scrot x11-utils libgl1-mesa-dri
+          python -m pip install -r forge3d-world/requirements.txt
+      - name: Build and quality-check real GLB
+        run: |
+          cd forge3d-world
+          python generate.py --output outputs/AEGIS_Outpost.glb
+          python -m pytest -q tests/
+      - name: Launch XFCE X11 desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          Xvfb :99 -screen 0 1280x800x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
+          sleep 3
+          DISPLAY=:99 dbus-launch --exit-with-session xfce4-session >/tmp/xfce.log 2>&1 &
+          sleep 13
+          pgrep -af xfce4-session
+          DISPLAY=:99 xset q >/dev/null
+          echo 'DISPLAY=:99' >> "$GITHUB_ENV"
+      - name: Open GLB in Blender and render proof
+        run: |
+          blender -b -t 2 --factory-startup --python-exit-code 1 --python forge3d-world/github/blender_review.py -- forge3d-world/outputs/AEGIS_Outpost.glb forge3d-world/outputs/blender
+      - name: Screenshot real XFCE desktop
+        run: |
+          mkdir -p forge3d-world/outputs/xfce
+          (timeout 40s blender -t 2 forge3d-world/outputs/blender/AEGIS_Outpost.blend >/tmp/blender-gui.log 2>&1 || true) &
+          sleep 15
+          scrot forge3d-world/outputs/xfce/XFCE_Desktop.png
+          test -s forge3d-world/outputs/xfce/XFCE_Desktop.png
+      - name: Upload generated GLB, blend, review, XFCE screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aegis-outpost-game-map
+          path: |
+            forge3d-world/outputs/*.glb
+            forge3d-world/outputs/*.json
+            forge3d-world/outputs/blender/*
+            forge3d-world/outputs/xfce/*
+          retention-days: 14
