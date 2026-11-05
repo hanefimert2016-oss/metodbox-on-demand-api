@@ -75,9 +75,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/" > /tmp/miras-index.html
-          grep -qi 'MİRAS' /tmp/miras-index.html
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/api/health" > /tmp/miras-health.json
+          echo "Waiting for Workers.dev propagation..."
+          for attempt in $(seq 1 20); do
+            HOME_CODE=$(curl -sSL --max-time 15 -o /tmp/miras-index.html -w '%{http_code}' "$PUBLIC_URL/" || true)
+            HEALTH_CODE=$(curl -sSL --max-time 15 -o /tmp/miras-health.json -w '%{http_code}' "$PUBLIC_URL/api/health" || true)
+            echo "Attempt $attempt: homepage HTTP $HOME_CODE, API health HTTP $HEALTH_CODE"
+            if [[ "$HOME_CODE" == "200" && "$HEALTH_CODE" == "200" ]] && grep -qi 'MİRAS' /tmp/miras-index.html; then
+              break
+            fi
+            if [[ "$attempt" == "20" ]]; then
+              echo "::error::Cloudflare Worker did not become publicly available"
+              echo "Last home response:"; head -c 300 /tmp/miras-index.html || true
+              echo "Last API response:"; head -c 300 /tmp/miras-health.json || true
+              exit 1
+            fi
+            sleep 5
+          done
           curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/api/videos" > /tmp/miras-videos.json
           node -e "const f=require('fs');const h=JSON.parse(f.readFileSync('/tmp/miras-health.json'));const v=JSON.parse(f.readFileSync('/tmp/miras-videos.json'));if(!h.ok||v.videos.length<28)process.exit(1);console.log('Verified',v.videos.length,'videos; community enabled:',h.configured)"
           echo "Verified live URL: $PUBLIC_URL" >> "$GITHUB_STEP_SUMMARY"
