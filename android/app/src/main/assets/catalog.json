@@ -1,0 +1,758 @@
+[
+  {
+    "id": "istanbul-full-walk",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Istanbul on foot: Galata to Dolmabahçe (55-minute walk)",
+      "tr": "İstanbul yürüyüşü: Galata’dan Dolmabahçe’ye (55 dakika)"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by POPtravel.",
+      "tr": "POPtravel tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 3286,
+    "creator": "POPtravel",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm/640px--Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/78/Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm/640px--Walking_in_ISTANBUL_-_Turkey_-_Galata_Tower%2C_Taksim%2C_Dolmabah%C3%A7e_-_4K_60fps_(UHD).webm.jpg",
+    "file_name": "Walking in ISTANBUL - Turkey - Galata Tower, Taksim, Dolmabahçe - 4K 60fps (UHD).webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "black-sea-ride",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Black Sea road journey: Amasra to Sinop (24 min)",
+      "tr": "Karadeniz yolculuğu: Amasra’dan Sinop’a (24 dk)"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by fatih kaplan.",
+      "tr": "fatih kaplan tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 1454,
+    "creator": "fatih kaplan",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Amasra_Sinop_aras%C4%B1.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Amasra_Sinop_aras%C4%B1.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Amasra_Sinop_aras%C4%B1.webm/640px--Amasra_Sinop_aras%C4%B1.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Amasra_Sinop_aras%C4%B1.webm/640px--Amasra_Sinop_aras%C4%B1.webm.jpg",
+    "file_name": "Amasra Sinop arası.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "little-hagia-sophia",
+    "type": "curated",
+    "category": "history",
+    "title": {
+      "en": "Inside Little Hagia Sophia: 9 minutes in Istanbul",
+      "tr": "Küçük Ayasofya’nın içinde: İstanbul’dan 9 dakika"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by Ggia.",
+      "tr": "Ggia tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 536,
+    "creator": "Ggia",
+    "license": "CC BY-SA 3.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv/640px--20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv/640px--20101222_Kucuk_Ayasofya_Mosque_Istanbul_Turkey.ogv.jpg",
+    "file_name": "20101222 Kucuk Ayasofya Mosque Istanbul Turkey.ogv",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "istanbul-one-day",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "One day in Istanbul: neighborhoods and sights",
+      "tr": "İstanbul’da bir gün: semtler ve manzaralar"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 391,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:One_Day_in_Istanbul_4K.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/One_Day_in_Istanbul_4K.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/One_Day_in_Istanbul_4K.webm/640px--One_Day_in_Istanbul_4K.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/One_Day_in_Istanbul_4K.webm/640px--One_Day_in_Istanbul_4K.webm.jpg",
+    "file_name": "One Day in Istanbul 4K.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "istanbul-panoramic",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Istanbul panorama: a six-minute tour",
+      "tr": "İstanbul panoraması: altı dakikalık şehir turu"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by Le Monde en Vidéo.",
+      "tr": "Le Monde en Vidéo tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 384,
+    "creator": "Le Monde en Vidéo",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm/640px--Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm/640px--Istanbul_city_tour_%2CTurkey-_HD_Panoramic_view.webm.jpg",
+    "file_name": "Istanbul city tour ,Turkey- HD Panoramic view.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "ayvalik-cunda",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Ayvalık and Cunda Island: coastal Türkiye",
+      "tr": "Ayvalık ve Cunda Adası: Ege kıyıları"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 256,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm/640px--Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm/640px--Ayval%C4%B1k_%26_Cunda_Island_-_TURKEY.webm.jpg",
+    "file_name": "Ayvalık & Cunda Island - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "bozcaada-island",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Bozcaada: life on an Aegean island",
+      "tr": "Bozcaada: Ege’de ada yaşamı"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 237,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:BOZCAADA_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/BOZCAADA_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/BOZCAADA_TURKEY.webm/640px--BOZCAADA_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/84/BOZCAADA_TURKEY.webm/640px--BOZCAADA_TURKEY.webm.jpg",
+    "file_name": "BOZCAADA TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "dalyan-boat",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Dalyan and İztuzu: a boat journey",
+      "tr": "Dalyan ve İztuzu Plajı: tekne yolculuğu"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 190,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm/640px--K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm/640px--K%C3%B6yce%C4%9Fiz_-_Dalyan_-_%C4%B0ztuzu_Beach_-_TURKEY.webm.jpg",
+    "file_name": "Köyceğiz - Dalyan - İztuzu Beach - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "abant-lake",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Abant Lake: a quiet escape into nature",
+      "tr": "Abant Gölü: doğanın içinde sakin bir gezi"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 166,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:BOLU_ABANT_LAKE_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/BOLU_ABANT_LAKE_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/BOLU_ABANT_LAKE_-_TURKEY.webm/640px--BOLU_ABANT_LAKE_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/BOLU_ABANT_LAKE_-_TURKEY.webm/640px--BOLU_ABANT_LAKE_-_TURKEY.webm.jpg",
+    "file_name": "BOLU ABANT LAKE - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "datca-4k",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Datça in 4K: wild Aegean coastlines",
+      "tr": "Datça 4K: Ege’nin doğal kıyıları"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 145,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Dat%C3%A7a_-_TURKEY_4K.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Dat%C3%A7a_-_TURKEY_4K.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Dat%C3%A7a_-_TURKEY_4K.webm/640px--Dat%C3%A7a_-_TURKEY_4K.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Dat%C3%A7a_-_TURKEY_4K.webm/640px--Dat%C3%A7a_-_TURKEY_4K.webm.jpg",
+    "file_name": "Datça - TURKEY 4K.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "agva-village",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Ağva: riverside landscapes near Istanbul",
+      "tr": "Ağva: İstanbul yakınlarında nehir ve doğa"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 140,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm/640px--A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm/640px--A%C4%9Fva_-_%C4%B0stanbul_-_Turkey.webm.jpg",
+    "file_name": "Ağva - İstanbul - Turkey.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "olympos-antalya",
+    "type": "curated",
+    "category": "history",
+    "title": {
+      "en": "Ancient Olympos: Antalya’s archaeological heritage",
+      "tr": "Antik Olympos: Antalya’nın arkeolojik mirası"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 137,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Olympos_Antique_City_-_Antalya_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Olympos_Antique_City_-_Antalya_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Olympos_Antique_City_-_Antalya_-_TURKEY.webm/640px--Olympos_Antique_City_-_Antalya_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cf/Olympos_Antique_City_-_Antalya_-_TURKEY.webm/640px--Olympos_Antique_City_-_Antalya_-_TURKEY.webm.jpg",
+    "file_name": "Olympos Antique City - Antalya - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "cappadocia-long",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Cappadocia 4K: valleys and fairy chimneys",
+      "tr": "Kapadokya 4K: vadiler ve peri bacaları"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 129,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Cappadocia_4K_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Cappadocia_4K_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Cappadocia_4K_-_TURKEY.webm/640px--Cappadocia_4K_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Cappadocia_4K_-_TURKEY.webm/640px--Cappadocia_4K_-_TURKEY.webm.jpg",
+    "file_name": "Cappadocia 4K - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "aizanoi-temple",
+    "type": "curated",
+    "category": "history",
+    "title": {
+      "en": "Aizanoi: the ancient Temple of Zeus",
+      "tr": "Aizanoi: antik Zeus Tapınağı"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 123,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm/640px--Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm/640px--Aizonai_Temple_of_Zeus_(4K)_-_TURKEY.webm.jpg",
+    "file_name": "Aizonai Temple of Zeus (4K) - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "gokova-akyaka",
+    "type": "curated",
+    "category": "nature",
+    "title": {
+      "en": "Akyaka and Gökova: where river meets sea",
+      "tr": "Akyaka ve Gökova: nehrin denizle buluştuğu yer"
+    },
+    "description": {
+      "en": "Real original footage of Türkiye, filmed by yasin ilcebay.",
+      "tr": "yasin ilcebay tarafından çekilen gerçek Türkiye görüntüleri."
+    },
+    "duration": 147,
+    "creator": "yasin ilcebay",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:G%C3%96KOVA_AKYAKA_-_TURKEY.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/G%C3%96KOVA_AKYAKA_-_TURKEY.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/G%C3%96KOVA_AKYAKA_-_TURKEY.webm/640px--G%C3%96KOVA_AKYAKA_-_TURKEY.webm.jpg",
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/G%C3%96KOVA_AKYAKA_-_TURKEY.webm/640px--G%C3%96KOVA_AKYAKA_-_TURKEY.webm.jpg",
+    "file_name": "GÖKOVA AKYAKA - TURKEY.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0
+  },
+  {
+    "id": "adana-kebab",
+    "type": "curated",
+    "category": "food",
+    "title": {
+      "en": "Adana kebab: hands of a local master",
+      "tr": "Adana kebabı: ustanın ellerinde"
+    },
+    "description": {
+      "en": "A real kebab maker prepares skewers in Kazancılar Bazaar, Adana. Filmed by Basak in 2024.",
+      "tr": "Adana Kazancılar Çarşısı’nda bir usta kebap şişlerini hazırlıyor. Basak’ın 2024 yılındaki gerçek çekimi."
+    },
+    "duration": 5,
+    "creator": "Basak",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Adanada_%C5%9Ei%C5%9F_Kebap.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Adanada_%C5%9Ei%C5%9F_Kebap.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Adanada_%C5%9Ei%C5%9F_Kebap.webm/640px--Adanada_%C5%9Ei%C5%9F_Kebap.webm.jpg",
+    "file_name": "Adanada Şiş Kebap.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Adanada_%C5%9Ei%C5%9F_Kebap.webm/640px--Adanada_%C5%9Ei%C5%9F_Kebap.webm.jpg"
+  },
+  {
+    "id": "street-baglama",
+    "type": "curated",
+    "category": "arts",
+    "title": {
+      "en": "The sound of a bağlama on the streets",
+      "tr": "Sokakta bağlama sesi"
+    },
+    "description": {
+      "en": "A street musician performs with a bağlama in Türkiye. Filmed by Asif Masimov.",
+      "tr": "Türkiye sokaklarında bağlama çalan bir müzisyenin gerçek performansı. Asif Masimov’un çekimi."
+    },
+    "duration": 24,
+    "creator": "Asif Masimov",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Turkish_street_Music_with_baglama.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Turkish_street_Music_with_baglama.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Turkish_street_Music_with_baglama.webm/640px--Turkish_street_Music_with_baglama.webm.jpg",
+    "file_name": "Turkish street Music with baglama.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Turkish_street_Music_with_baglama.webm/640px--Turkish_street_Music_with_baglama.webm.jpg"
+  },
+  {
+    "id": "adana-tinsmith",
+    "type": "curated",
+    "category": "arts",
+    "title": {
+      "en": "Traditional tinsmith at work in Adana",
+      "tr": "Adana’da kalaycı ustasının işçiliği"
+    },
+    "description": {
+      "en": "A traditional metalworker in Kazancılar Bazaar. Real footage by Basak.",
+      "tr": "Kazancılar Çarşısı’nda geleneksel kalaycılık yapan bir usta. Basak tarafından kaydedildi."
+    },
+    "duration": 6,
+    "creator": "Basak",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Adana'da_kalayc%C4%B1.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Adana'da_kalayc%C4%B1.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Adana%27da_kalayc%C4%B1.webm/640px--Adana%27da_kalayc%C4%B1.webm.jpg",
+    "file_name": "Adana'da kalaycı.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Adana%27da_kalayc%C4%B1.webm/640px--Adana%27da_kalayc%C4%B1.webm.jpg"
+  },
+  {
+    "id": "turkish-folk-dance",
+    "type": "curated",
+    "category": "arts",
+    "title": {
+      "en": "Traditional Turkish dance in Göreme",
+      "tr": "Göreme’de geleneksel Türk halk dansları"
+    },
+    "description": {
+      "en": "Real footage from a Turkish traditional dance competition in Göreme (2012). Large video: Wi-Fi recommended.",
+      "tr": "Göreme’de geleneksel dans yarışmasının gerçek kaydı (2012). Büyük video, Wi-Fi önerilir."
+    },
+    "duration": 454,
+    "creator": "GloboTreks",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Traditional_Turkish_Dance_Competition.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Traditional_Turkish_Dance_Competition.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Traditional_Turkish_Dance_Competition.webm/640px--Traditional_Turkish_Dance_Competition.webm.jpg",
+    "file_name": "Traditional Turkish Dance Competition.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Traditional_Turkish_Dance_Competition.webm/640px--Traditional_Turkish_Dance_Competition.webm.jpg"
+  },
+  {
+    "id": "flour-halva",
+    "type": "curated",
+    "category": "food",
+    "title": {
+      "en": "Roasting flour halva the traditional way",
+      "tr": "Geleneksel un helvası kavurma"
+    },
+    "description": {
+      "en": "Flour halva being cooked in Akçaabat, Trabzon. Filmed by Basak.",
+      "tr": "Trabzon Akçaabat’ta un helvası kavurma. Basak’ın gerçek çekimi."
+    },
+    "duration": 3,
+    "creator": "Basak",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Un_helvas%C4%B1_kavurma_1.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Un_helvas%C4%B1_kavurma_1.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Un_helvas%C4%B1_kavurma_1.webm/640px--Un_helvas%C4%B1_kavurma_1.webm.jpg",
+    "file_name": "Un helvası kavurma 1.webm",
+    "human_filmed": true,
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Un_helvas%C4%B1_kavurma_1.webm/640px--Un_helvas%C4%B1_kavurma_1.webm.jpg"
+  },
+  {
+    "id": "bosphorus",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "The Bosphorus: a city between continents",
+      "tr": "Boğaz: iki kıta arasında bir şehir"
+    },
+    "description": {
+      "en": "Watch real scenes from the heart of Istanbul.",
+      "tr": "İstanbul’un kalbinden gerçek görüntüler."
+    },
+    "duration": 16,
+    "creator": "ErikaGuetti",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bosforo_Istambul.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bosforo_Istambul.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Bosforo_Istambul.webm/640px--Bosforo_Istambul.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Bosforo Istambul.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Bosforo_Istambul.webm/640px--Bosforo_Istambul.webm.jpg"
+  },
+  {
+    "id": "turkish-tea",
+    "type": "curated",
+    "category": "food",
+    "title": {
+      "en": "The art of Turkish tea",
+      "tr": "Türk çayı: ince belli bardakta gelenek"
+    },
+    "description": {
+      "en": "Tea making near Lake Bafa, filmed in Türkiye.",
+      "tr": "Bafa Gölü yakınlarında geleneksel Türk çayı hazırlığı."
+    },
+    "duration": 13,
+    "creator": "Klapi",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Turkish_tea_2015.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Turkish_tea_2015.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Turkish_tea_2015.webm/640px--Turkish_tea_2015.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Turkish tea 2015.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Turkish_tea_2015.webm/640px--Turkish_tea_2015.webm.jpg"
+  },
+  {
+    "id": "pamukkale",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Pamukkale, Türkiye’s cotton castle",
+      "tr": "Pamukkale: Türkiye’nin beyaz cenneti"
+    },
+    "description": {
+      "en": "Experience the dazzling white terraces in Denizli.",
+      "tr": "Denizli’nin beyaz travertenlerinden görüntüler."
+    },
+    "duration": 25,
+    "creator": "Klapi",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Pamukkale_Turkey_2015.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Pamukkale_Turkey_2015.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Pamukkale_Turkey_2015.webm/640px--Pamukkale_Turkey_2015.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Pamukkale Turkey 2015.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/33/Pamukkale_Turkey_2015.webm/640px--Pamukkale_Turkey_2015.webm.jpg"
+  },
+  {
+    "id": "istanbul-ferry",
+    "type": "curated",
+    "category": "daily",
+    "title": {
+      "en": "Across the Bosphorus by ferry",
+      "tr": "Boğaz’da vapur yolculuğu"
+    },
+    "description": {
+      "en": "A real ferry crossing in Istanbul, recorded in 2025.",
+      "tr": "2025 yılında İstanbul Boğazı’nda çekilmiş bir vapur yolculuğu."
+    },
+    "duration": 11,
+    "creator": "Kurmanbek",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:A_ferry_in_the_Bosphorus_20251015.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/A_ferry_in_the_Bosphorus_20251015.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/A_ferry_in_the_Bosphorus_20251015.webm/640px--A_ferry_in_the_Bosphorus_20251015.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "A ferry in the Bosphorus 20251015.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/A_ferry_in_the_Bosphorus_20251015.webm/640px--A_ferry_in_the_Bosphorus_20251015.webm.jpg"
+  },
+  {
+    "id": "hagiasophia",
+    "type": "curated",
+    "category": "history",
+    "title": {
+      "en": "A glimpse inside Hagia Sophia",
+      "tr": "Ayasofya’nın içinde bir yolculuk"
+    },
+    "description": {
+      "en": "Historic interior footage of Istanbul’s extraordinary landmark.",
+      "tr": "İstanbul’un tarihî simgelerinden Ayasofya’nın içinden çekim."
+    },
+    "duration": 39,
+    "creator": "Miklos Kiss",
+    "license": "CC BY 3.0",
+    "license_url": "https://creativecommons.org/licenses/by/3.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Aya_Sofya%2C_May_2016.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Aya_Sofya%2C_May_2016.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Aya_Sofya%2C_May_2016.webm/640px--Aya_Sofya%2C_May_2016.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Aya Sofya, May 2016.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Aya_Sofya%2C_May_2016.webm/640px--Aya_Sofya%2C_May_2016.webm.jpg"
+  },
+  {
+    "id": "bodrum",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Bodrum: a walk through Bitez",
+      "tr": "Bodrum: Bitez sokaklarında"
+    },
+    "description": {
+      "en": "Everyday street life in Bitez on the Aegean coast.",
+      "tr": "Ege kıyısında Bitez’in günlük yaşamından gerçek görüntüler."
+    },
+    "duration": 32,
+    "creator": "Klapi",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Bitez_District_Bodrum_Turkey_Speed_walk.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Bitez_District_Bodrum_Turkey_Speed_walk.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Bitez_District_Bodrum_Turkey_Speed_walk.webm/640px--Bitez_District_Bodrum_Turkey_Speed_walk.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Bitez District Bodrum Turkey Speed walk.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Bitez_District_Bodrum_Turkey_Speed_walk.webm/640px--Bitez_District_Bodrum_Turkey_Speed_walk.webm.jpg"
+  },
+  {
+    "id": "istanbul-moda",
+    "type": "curated",
+    "category": "places",
+    "title": {
+      "en": "Istanbul from the shores of Moda",
+      "tr": "Moda sahilinden İstanbul manzarası"
+    },
+    "description": {
+      "en": "The European skyline seen from the Asian side.",
+      "tr": "Asya yakasından Avrupa yakasının manzarası."
+    },
+    "duration": 6,
+    "creator": "Kurmanbek",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:View_of_the_European_side_from_Moda_beach_20250405.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/View_of_the_European_side_from_Moda_beach_20250405.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/View_of_the_European_side_from_Moda_beach_20250405.webm/640px--View_of_the_European_side_from_Moda_beach_20250405.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "View of the European side from Moda beach 20250405.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/View_of_the_European_side_from_Moda_beach_20250405.webm/640px--View_of_the_European_side_from_Moda_beach_20250405.webm.jpg"
+  },
+  {
+    "id": "remembrance",
+    "type": "curated",
+    "category": "history",
+    "title": {
+      "en": "Remembering Atatürk on November 10",
+      "tr": "10 Kasım: Atatürk’ü anma"
+    },
+    "description": {
+      "en": "A real recording of the moment Türkiye pauses to remember Atatürk.",
+      "tr": "Türkiye’nin Atatürk’ü saygıyla andığı 10 Kasım’dan gerçek kayıt."
+    },
+    "duration": 10,
+    "creator": "VikiPicture",
+    "license": "CC BY-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Atat%C3%BCrk'%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm",
+    "video_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Atat%C3%BCrk'%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm",
+    "cover": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Atat%C3%BCrk%27%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm/640px--Atat%C3%BCrk%27%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm.jpg",
+    "created_at": "2026-11-04T00:00:00.000Z",
+    "views": 0,
+    "likes": 0,
+    "comments": 0,
+    "file_name": "Atatürk'ü anma - 10 Kasım 2016 saat 9.05 siren sesleri 2.webm",
+    "human_filmed": true,
+    "poster_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Atat%C3%BCrk%27%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm/640px--Atat%C3%BCrk%27%C3%BC_anma_-_10_Kas%C4%B1m_2016_saat_9.05_siren_sesleri_2.webm.jpg"
+  }
+]

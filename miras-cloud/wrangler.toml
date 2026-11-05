@@ -1,0 +1,10 @@
+name = "miras-turkiye-stories"
+main = "src/worker.mjs"
+compatibility_date = "2026-11-05"
+workers_dev = true
+
+[assets]
+directory = "../miras-magicpath/dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/watch/*", "/media/*"]
+not_found_handling = "single-page-application"

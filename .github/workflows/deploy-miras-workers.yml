@@ -1,0 +1,90 @@
+name: MİRAS Website - Cloudflare Workers
+on:
+  push:
+    branches: [miras-workers-20261105]
+    paths:
+      - 'miras-magicpath/**'
+      - 'miras-cloud/**'
+      - 'android/app/src/main/assets/catalog.json'
+      - '.github/workflows/deploy-miras-workers.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: miras-workers-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing Cloudflare token"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare account ID"; exit 1; }
+      - name: Build original MagicPath website
+        working-directory: miras-magicpath
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+          test -s dist/index.html
+          test -f dist/config.js
+          test -f dist/img/poster-unavailable.svg
+      - name: Test original MİRAS Worker
+        run: node --test miras-cloud/tests/*.test.mjs
+      - name: Verify 28 licensed videos
+        run: |
+          node --input-type=module -e "import c from './android/app/src/main/assets/catalog.json' with {type:'json'}; if(c.length!==28 || !c.every(v=>v.creator&&v.license&&v.video_url&&v.poster_url))process.exit(1); console.log('Video count:',c.length)"
+      - name: Deploy isolated MİRAS Workers.dev site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config miras-cloud/wrangler.toml 2>&1 | tee /tmp/miras-deploy.log
+          URL=$(grep -Eo 'https://[a-zA-Z0-9.-]+[.]workers[.]dev' /tmp/miras-deploy.log | tail -1 || true)
+          test -n "$URL" || { echo "::error::Missing deployed Worker URL"; exit 1; }
+          echo "PUBLIC_URL=$URL" >> "$GITHUB_ENV"
+          printf '%s\n' "$URL" > miras-workers-public-url.txt
+          echo "MİRAS website: $URL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Configure optional MİRAS account and upload secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MIRAS_GITHUB_TOKEN: ${{ secrets.MIRAS_GITHUB_TOKEN }}
+          MIRAS_SESSION_SECRET: ${{ secrets.MIRAS_SESSION_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$MIRAS_GITHUB_TOKEN" && -n "$MIRAS_SESSION_SECRET" ]]; then
+            printf '%s' "$MIRAS_GITHUB_TOKEN" | npx --yes wrangler@4 secret put MIRAS_GITHUB_TOKEN --config miras-cloud/wrangler.toml
+            printf '%s' "$MIRAS_SESSION_SECRET" | npx --yes wrangler@4 secret put MIRAS_SESSION_SECRET --config miras-cloud/wrangler.toml
+            echo "Community storage enabled." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::MİRAS account/video-upload secrets not configured; public catalog remains online."
+          fi
+      - name: Verify live website and catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/" > /tmp/miras-index.html
+          grep -qi 'MİRAS' /tmp/miras-index.html
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/api/health" > /tmp/miras-health.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 "$PUBLIC_URL/api/videos" > /tmp/miras-videos.json
+          node -e "const f=require('fs');const h=JSON.parse(f.readFileSync('/tmp/miras-health.json'));const v=JSON.parse(f.readFileSync('/tmp/miras-videos.json'));if(!h.ok||v.videos.length<28)process.exit(1);console.log('Verified',v.videos.length,'videos; community enabled:',h.configured)"
+          echo "Verified live URL: $PUBLIC_URL" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MIRAS-Workers-Public-URL
+          path: miras-workers-public-url.txt
+          if-no-files-found: ignore
+          retention-days: 30
