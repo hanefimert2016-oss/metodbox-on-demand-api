@@ -33,3 +33,19 @@ jobs:
             }catch(e){console.log(label,'error',e.name);}
           }
           EOF
+      - name: Check falconos.tech custom hostname availability
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          const headers={Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN};
+          const a=await (await fetch('https://api.cloudflare.com/client/v4/zones?name=falconos.tech',{headers})).json();
+          const zone=a.result?.find(z=>z.name==='falconos.tech');
+          if(!zone){console.log('Zone is not accessible');process.exit(1)}
+          console.log('zone_status:',zone.status);
+          const b=await fetch('https://api.cloudflare.com/client/v4/zones/'+zone.id+'/dns_records?name=miras.falconos.tech',{headers});
+          const j=await b.json();
+          console.log('dns_records_readable:',j.success,'count:',j.result?.length??'not-authorized');
+          if(j.result?.length) console.log('existing_dns_record_types:',j.result.map(v=>v.type).join(','));
+          EOF
