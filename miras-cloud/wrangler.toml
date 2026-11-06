@@ -2,6 +2,7 @@ name = "miras-turkiye-stories"
 main = "src/worker.mjs"
 compatibility_date = "2026-11-05"
 workers_dev = true
+routes = [{ pattern = "miras.falconos.tech", custom_domain = true }]
 
 [assets]
 directory = "../miras-magicpath/dist"
