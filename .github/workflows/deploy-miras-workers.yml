@@ -55,6 +55,19 @@ jobs:
           echo "PUBLIC_URL=$URL" >> "$GITHUB_ENV"
           printf '%s\n' "$URL" > miras-workers-public-url.txt
           echo "MİRAS website: $URL" >> "$GITHUB_STEP_SUMMARY"
+      - name: Repair and verify public workers.dev route
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/miras-turkiye-stories/subdomain"
+          current=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$endpoint")
+          echo "$current" | node -e "let t='';process.stdin.on('data',d=>t+=d).on('end',()=>{const j=JSON.parse(t);if(!j.success)process.exit(1);console.log('Worker public route before repair:',Boolean(j.result.enabled))})"
+          repaired=$(curl -fsS -X POST "$endpoint" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data '{"enabled":true}')
+          echo "$repaired" | node -e "let t='';process.stdin.on('data',d=>t+=d).on('end',()=>{const j=JSON.parse(t);if(!j.success||!j.result.enabled){console.error('workers.dev enable failed:',JSON.stringify(j.errors||[]));process.exit(1)}console.log('Worker public route enabled:',j.result.enabled)})"
+          echo "workers.dev route explicitly enabled and checked" >> "$GITHUB_STEP_SUMMARY"
       - name: Configure optional MİRAS account and upload secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
