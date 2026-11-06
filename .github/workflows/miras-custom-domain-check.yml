@@ -1,0 +1,37 @@
+name: MİRAS custom-domain reachability checks
+on:
+  push:
+    branches: [miras-workers-20261105]
+    paths: ['.github/workflows/miras-custom-domain-check.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Confirm custom hostname resolves and website serves real videos
+        shell: bash
+        run: |
+          set -u
+          host="miras.falconos.tech"
+          getent ahostsv4 "$host" | head -n 4 || true
+          good=0
+          for i in $(seq 1 24); do
+            code=$(curl --connect-timeout 8 --max-time 18 -sSL -o /tmp/miras-home -w '%{http_code}' "https://$host/" 2>/tmp/curl-err || true)
+            api=$(curl --connect-timeout 8 --max-time 18 -sSL -o /tmp/miras-api -w '%{http_code}' "https://$host/api/health" 2>>/tmp/curl-err || true)
+            echo "Attempt $i, home: $code, API: $api"
+            if [[ "$code" == "200" && "$api" == "200" ]]; then good=1; break; fi
+            sleep 8
+          done
+          if [[ "$good" == "0" ]]; then
+            echo "Host check failed. Last curl details:"
+            tail -c 1200 /tmp/curl-err || true
+            exit 1
+          fi
+          cat /tmp/miras-api
+          echo
+          curl -fsS "https://$host/api/videos" > /tmp/miras-videos
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('/tmp/miras-videos'));if((j.videos||[]).length<28)process.exit(2);console.log('Custom domain video count:',j.videos.length)"
+          echo "MİRAS custom domain LIVE: https://$host" >> "$GITHUB_STEP_SUMMARY"
